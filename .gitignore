@@ -1,0 +1,4 @@
+.vscode/
+Development-Exclusive/
+node_modules/
+package-lock.json
