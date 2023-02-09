@@ -10,16 +10,22 @@ const gameWindow = {
 };
 
 const colors = {
-  background: "#0D1117",
+  background: "#252526",
   gameObjects: {
     ball: "#382694",
     paddle: "#FFF",
     bricks: "#999",
+    pillars: "#0D1117",
   },
   text: {
-    score: "#000",
+    score: "#FFF",
     lose: "#F00",
   },
+};
+
+const pillars = {
+  width: 250,
+  height: 300,
 };
 
 const gameStateText = {
@@ -48,34 +54,88 @@ let gameState = "playing";
 
 /// Fundamental Classes
 class Ball {
-  constructor(paddle) {
+  constructor(paddle, ...pillars) {
     this.D = 30;
+    this.rad = 15;
     this.velocity = createVector(gameWindow.X / 150, -gameWindow.Y / 150);
     this.location = createVector(
       paddle.location.x + paddle.width / 2,
-      paddle.location.y - this.D / 2
+      paddle.location.y - this.rad
     );
     this.paddle = paddle;
+    this.pillars = pillars;
   }
 
   bouncePaddle() {
-    const xCheckMax = this.location.x + this.D / 2 >= this.paddle.location.x;
+    const xCheckMax =
+      this.location.x - this.rad <=
+      this.paddle.location.x + this.paddle.width / 2;
     const xCheckMin =
-      this.location.x - this.D / 2 <=
-      this.paddle.location.x + this.paddle.width;
+      this.location.x + this.rad >=
+      this.paddle.location.x - this.paddle.width / 2;
 
     if (xCheckMax && xCheckMin) {
-      if (this.location.y + this.D / 2 > this.paddle.location.y) {
+      if (
+        this.location.y + this.rad >=
+        this.paddle.location.y - this.paddle.height / 2
+      ) {
         this.rev("y");
-        this.location.y = this.paddle.location.y - this.D / 2 - BugFixVal;
+        this.location.y =
+          this.paddle.location.y -
+          this.paddle.height / 2 -
+          this.rad -
+          BugFixVal;
+      }
+    }
+  }
+
+  bouncePillar() {
+    for (let pillar of this.pillars) {
+      line(
+        pillar.location.x - pillar.width / 2,
+        pillar.location.y,
+        pillar.location.x - pillar.width / 2,
+        gameWindow.Y
+      );
+      line(
+        pillar.location.x + pillar.width / 2,
+        pillar.location.y,
+        pillar.location.x + pillar.width / 2,
+        gameWindow.Y
+      );
+
+      // FIXME: there are some colliding issues with both of these ifs, need to find a way to have one or the other trigger, not both at some times
+
+      if (this.location.y + this.rad < pillar.height) {
+        if (
+          (this.location.x - this.rad > 0 &&
+            this.location.x + this.rad < pillar.width) ||
+          (this.location.x - this.rad >
+            gameWindow.getMiddleX() - pillar.width / 2 &&
+            this.location.x + this.rad <
+              gameWindow.getMiddleX() + pillar.width / 2) ||
+          (this.location.x - this.rad > gameWindow.X - pillar.width &&
+            this.location.x + this.rad < gameWindow.X)
+        )
+          this.rev("x");
+      }
+
+      if (
+        this.location.x + this.rad >= pillar.location.x - pillar.width / 2 &&
+        this.location.x - this.rad <= pillar.location.x + pillar.width / 2 &&
+        this.location.y - this.rad <= pillar.location.y + pillar.height / 2
+      ) {
+        this.rev("y");
+        fill("red");
+        rect(gameWindow.getMiddleX(), gameWindow.getMiddleY(), 50);
       }
     }
   }
 
   bounceEdge() {
-    if (this.location.x + this.D / 2 >= gameWindow.X) this.rev("x");
-    if (this.location.x - this.D / 2 <= 0) this.rev("x");
-    if (this.location.y - this.D / 2 <= 0) this.rev("y");
+    if (this.location.x + this.rad >= gameWindow.X) this.rev("x");
+    if (this.location.x - this.rad <= 0) this.rev("x");
+    if (this.location.y - this.rad <= 0) this.rev("y");
   }
 
   display() {
@@ -92,7 +152,7 @@ class Ball {
   }
 
   belowBottom() {
-    return this.location.y - this.D / 2 > gameWindow.Y;
+    return this.location.y - this.rad > gameWindow.Y;
   }
 }
 
@@ -102,7 +162,7 @@ class Paddle {
     this.height = 25;
     this.YOffset = 35;
     this.location = createVector(
-      gameWindow.getMiddleX() - this.width / 2,
+      gameWindow.getMiddleX(),
       gameWindow.Y - this.YOffset
     );
 
@@ -118,14 +178,29 @@ class Paddle {
   }
 
   move() {
-    if (this.location.x < 0) this.location.x = 0;
-    if (this.location.x + this.width > gameWindow.X)
-      this.location.x = gameWindow.X - this.width;
+    if (this.location.x - this.width / 2 < 0) this.location.x = this.width / 2;
+    if (this.location.x + this.width / 2 > gameWindow.X)
+      this.location.x = gameWindow.X - this.width / 2;
 
     if (keyIsDown(LEFT_ARROW) || keyIsDown(keyCodesObject.A))
       this.location.add(this.speed.left);
     if (keyIsDown(RIGHT_ARROW) || keyIsDown(keyCodesObject.D))
       this.location.add(this.speed.right);
+  }
+}
+
+class Pillar {
+  constructor(location, width, height) {
+    this.location = location;
+    this.width = width;
+    this.height = height;
+  }
+
+  display() {
+    fill(colors.gameObjects.pillars);
+    rect(this.location.x, this.location.y, this.width, this.height);
+    // line(this.location.x - this.width / 2, this.location.y, this.location.x - this.width / 2, gameWindow.Y);
+    // line(this.location.x + this.width / 2, this.location.y, this.location.x + this.width / 2, gameWindow.Y);
   }
 }
 
@@ -143,13 +218,15 @@ class Brick {
   }
 
   isBallColliding(ball) {
-    const xCheckMax = ball.location.x + ball.D / 2 >= this.location.x;
+    const xCheckMax =
+      ball.location.x + ball.D / 2 >= this.location.x - this.width / 2;
     const xCheckMin =
-      ball.location.x - ball.D / 2 <= this.location.x + this.width;
+      ball.location.x - ball.D / 2 <= this.location.x + this.width / 2;
 
-    const yCheckMax = ball.location.y + ball.D / 2 >= this.location.y;
+    const yCheckMax =
+      ball.location.y + ball.D / 2 >= this.location.y - this.height / 2;
     const yCheckMin =
-      ball.location.y - ball.D / 2 <= this.location.y + this.height;
+      ball.location.y - ball.D / 2 <= this.location.y + this.height / 2;
 
     if (xCheckMax && xCheckMin && yCheckMax && yCheckMin) return true;
   }
@@ -160,6 +237,9 @@ class Brick {
 /// Game Objects
 let paddle;
 let ball;
+let pillar_1;
+let pillar_2;
+let pillar_3;
 
 // **************************************************** //
 
@@ -169,25 +249,43 @@ function setup() {
   gameWindow.X = displayWidth;
   gameWindow.Y = displayHeight;
 
+  pillar_1 = new Pillar(
+    createVector(pillars.width / 2, pillars.height / 2),
+    pillars.width,
+    pillars.height
+  );
+  pillar_2 = new Pillar(
+    createVector(gameWindow.getMiddleX(), pillars.height / 2),
+    pillars.width,
+    pillars.height
+  );
+  pillar_3 = new Pillar(
+    createVector(gameWindow.X - pillars.width / 2, pillars.height / 2),
+    pillars.width,
+    pillars.height
+  );
+
   paddle = new Paddle();
-  ball = new Ball(paddle);
+  ball = new Ball(paddle, pillar_1, pillar_2, pillar_3);
 
-  bricks = createBricks(colors.gameObjects.bricks);
-
+  const bricksArr = [
+    createBricks(pillars.width),
+    createBricks(gameWindow.getMiddleX() + pillars.width / 2),
+  ];
+  bricksArr.shift();
+  bricks = bricksArr.flat();
   scoreText.X = gameWindow.X - scoreText.textSize * 6;
   scoreText.Y = 50;
   gameStateText.X = gameWindow.getMiddleX() - gameStateText.textSize * 2;
   gameStateText.Y = gameWindow.getMiddleY();
 
   createCanvas(gameWindow.X, gameWindow.Y);
+  rectMode(CENTER);
 }
 
 function draw() {
   background(colors.background);
-  paddle.display();
-  manageBricks();
-
-  displayScore();
+  allTimeState();
 
   if (gameState === "playing") playingState();
   else endGame();
@@ -196,8 +294,20 @@ function draw() {
 // **************************************************** //
 
 /// Fundamental Functions
+function allTimeState() {
+  paddle.display();
+  manageBricks();
+
+  pillar_1.display();
+  pillar_2.display();
+  pillar_3.display();
+
+  displayScore();
+}
+
 function playingState() {
   ball.bounceEdge();
+  ball.bouncePillar();
   ball.bouncePaddle();
   ball.update();
   ball.display();
@@ -228,22 +338,27 @@ function displayScore() {
 
 let bricks = [];
 
-function createBricks() {
-  const rows = 10;
-  const bricksPerRow = 15;
+function createBricks(xOffSet) {
+  const rows = 5;
+  const bricksPerRow = 5;
   const brickSize = {
-    width: gameWindow.X / bricksPerRow,
-    height: 25,
+    width: (gameWindow.getMiddleX() - pillars.width * 1.5) / bricksPerRow,
+    height: 30,
   };
 
   let brick;
+  const yOffSet = brickSize.height * 3;
   for (let row = 0; row < rows; row++) {
     for (let i = 0; i < bricksPerRow; i++) {
       brick = new Brick(
-        createVector(brickSize.width * i, brickSize.height * row),
+        createVector(
+          brickSize.width * i + xOffSet + brickSize.width / 2,
+          brickSize.height * row + brickSize.height / 2 + yOffSet
+        ),
         brickSize.width,
         brickSize.height
       );
+
       bricks.push(brick);
     }
   }
@@ -261,8 +376,6 @@ function manageBricks() {
     } else brick.display();
   }
 }
-
-function createCastlePillars() {}
 
 function mousePressed() {
   if (
