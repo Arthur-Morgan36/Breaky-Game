@@ -262,6 +262,8 @@ function manageBricks() {
   }
 }
 
+function createCastlePillars() {}
+
 function mousePressed() {
   if (
     mouseX > 0 &&
