@@ -62,7 +62,7 @@ class Ball {
     this.rad = 20;
     this.location = createVector(
       paddle.location.x,
-      paddle.location.y - paddle.height - this.D
+      paddle.location.y - paddle.height - this.D * 3.5
     );
     this.velocity = createVector();
     this.acceleration = createVector();
@@ -138,7 +138,7 @@ class Ball {
   resetLocation() {
     this.location = createVector(
       paddle.location.x,
-      paddle.location.y - paddle.height - this.D
+      paddle.location.y - paddle.height - this.D * 3.5
     );
   }
 
@@ -194,10 +194,13 @@ class Paddle {
 class Cannon {
   constructor(paddle, ball) {
     this.spaceBarHit = 1;
-    this.angle = -PI / 2;
+    this.angle = -PI / 2; // Minus because the Y axis is reversed. Divided by 2 to be poiting straight at the top
+    this.height = 150;
+    this.width = 50;
+
     this.location = createVector(
       paddle.location.x,
-      paddle.location.y - paddle.height
+      paddle.location.y - paddle.height / 2 - this.height / 2
     );
     this.ball = ball;
     this.gravity = createVector(0, 0.05);
@@ -215,7 +218,6 @@ class Cannon {
       this.spaceBarHit = 0;
 
       const force = p5.Vector.fromAngle(this.angle);
-      console.log(force);
       force.mult(10);
       this.ball.applyForce(force);
     }
@@ -229,14 +231,18 @@ class Cannon {
   }
 
   rotate() {
-    if (keyIsDown(RIGHT_ARROW)) this.angle += 0.1;
     if (keyIsDown(LEFT_ARROW)) this.angle -= 0.1;
+    if (keyIsDown(RIGHT_ARROW)) this.angle += 0.1;
   }
 
   display() {
     fill(colors.gameObjects.cannon);
-    rect(this.location.x, this.location.y, 50, 75);
+
+    push();
+    translate(this.location.x, this.location.y); // translating is essential for rotation
     rotate(this.angle);
+    rect(0, 0, this.height, this.width);
+    pop();
   }
 }
 
