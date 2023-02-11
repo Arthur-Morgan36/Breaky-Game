@@ -269,17 +269,13 @@ class Brick {
   }
 
   isBallColliding(ball) {
-    const xCheckMax =
-      ball.location.x + ball.D / 2 >= this.location.x - this.width / 2;
-    const xCheckMin =
-      ball.location.x - ball.D / 2 <= this.location.x + this.width / 2;
-
-    const yCheckMax =
-      ball.location.y + ball.D / 2 >= this.location.y - this.height / 2;
-    const yCheckMin =
-      ball.location.y - ball.D / 2 <= this.location.y + this.height / 2;
-
-    if (xCheckMax && xCheckMin && yCheckMax && yCheckMin) return true;
+    if (
+      ball.location.x + ball.D / 2 >= this.location.x - this.width / 2 &&
+      ball.location.x - ball.D / 2 <= this.location.x + this.width / 2 &&
+      ball.location.y + ball.D / 2 >= this.location.y - this.height / 2 &&
+      ball.location.y - ball.D / 2 <= this.location.y + this.height / 2
+    )
+      return true;
   }
 }
 
@@ -348,6 +344,9 @@ function draw() {
 // **************************************************** //
 
 /// Fundamental Functions
+/**
+ * Methods and functions that are always rendering no matter the game state
+ */
 function allTimeState() {
   paddle.display();
   manageBricks();
@@ -359,13 +358,15 @@ function allTimeState() {
   displayScore();
 }
 
+/**
+ * Methods and functions when the game is running and the player hasn't lost yet. Also takes care of the loss and the winning stage.
+ */
 function playingState() {
   ball.bounceEdge();
   ball.bouncePillar();
   ball.collidePaddle();
   ball.outOfBounds();
   ball.display();
-  // ball.update();
 
   cannon.display();
   cannon.shoot();
@@ -377,6 +378,9 @@ function playingState() {
   if (bricks.length === 0) gameState = "win";
 }
 
+/**
+ * Ends the game and displays the end game message
+ */
 function endGame() {
   textSize(gameStateText.textSize);
   fill(gameState === "lose" ? colors.text.lose : randomColor());
@@ -389,6 +393,9 @@ function endGame() {
   );
 }
 
+/**
+ * Displays the score to the user
+ */
 function displayScore() {
   textSize(scoreText.textSize);
   fill(colors.text.score);
@@ -397,6 +404,11 @@ function displayScore() {
 
 let bricks = [];
 
+/**
+ *
+ * @param { number } xOffSet OffSet value on the Y axis due to the pillars existing.
+ * @returns an Array containing all the bricks. This fucntion is essential for the game to work properly
+ */
 function createBricks(xOffSet) {
   const rows = 5;
   const bricksPerRow = 5;
@@ -424,6 +436,9 @@ function createBricks(xOffSet) {
   return bricks;
 }
 
+/**
+ * Manages the briks, removes bricks that have been hit by the ball and otherwise displays the remaining bricks. Additionally it's used to reset the gravity of the cannonball to remove the initial velocity at which the ball might be thrown after a hit on a brick.
+ */
 function manageBricks() {
   for (let i = bricks.length - 1; i >= 0; i--) {
     const brick = bricks[i];
@@ -432,12 +447,16 @@ function manageBricks() {
       cannon.resetGravity();
       ball.resetSpeed();
       ball.resetLocation();
+
       bricks.splice(i, 1);
       playerScore += brick.points;
     } else brick.display();
   }
 }
 
+/**
+ * Used to fullscreen the game. P5.js calls this function on it's own, it just needs to be defined to work.
+ */
 function mousePressed() {
   if (
     mouseX > 0 &&
@@ -451,6 +470,10 @@ function mousePressed() {
 }
 
 /// Helper functions
+/**
+ * Used to generate a random color between black and white, in hexadecimal forma
+ * @returns random hexadecimal code (#000000)
+ */
 function randomColor() {
   return "#" + Math.trunc(Math.random() * 0xfff).toString(16);
 }
