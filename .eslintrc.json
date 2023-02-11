@@ -9,7 +9,7 @@
     "ecmaVersion": "latest"
   },
   "rules": {
-    "indent": ["error", ""],
+    "indent": ["error", "spaces"],
     "linebreak-style": ["error", "windows"],
     "quotes": ["error", "double"],
     "semi": ["error", "always"]

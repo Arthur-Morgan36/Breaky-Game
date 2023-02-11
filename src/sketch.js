@@ -13,6 +13,7 @@ const colors = {
   background: "#252526",
   gameObjects: {
     ball: "#382694",
+    cannon: "#FF9",
     paddle: "#FFF",
     bricks: "#999",
     pillars: "#0D1117",
@@ -38,15 +39,17 @@ const scoreText = {
 
 const keyCodesObject = {
   A: 65,
-  D: 69,
+  D: 68,
+  SPACE: 32,
 };
 
 // **************************************************** //
 
 /// Basic Variables
 
-const BugFixVal = 1; // pixels
+const bugFixVal = 1; // pixels
 
+let shot = false;
 let playerScore = 0;
 let gameState = "playing";
 
@@ -55,104 +58,105 @@ let gameState = "playing";
 /// Fundamental Classes
 class Ball {
   constructor(paddle, ...pillars) {
-    this.D = 30;
-    this.rad = 15;
-    this.velocity = createVector(gameWindow.X / 150, -gameWindow.Y / 150);
+    this.D = 40;
+    this.rad = 20;
     this.location = createVector(
-      paddle.location.x + paddle.width / 2,
-      paddle.location.y - this.rad
+      paddle.location.x,
+      paddle.location.y - paddle.height - this.D
     );
+    this.velocity = createVector();
+    this.acceleration = createVector();
+    this.topSpeed = 10;
+
     this.paddle = paddle;
     this.pillars = pillars;
   }
 
-  bouncePaddle() {
-    const xCheckMax =
-      this.location.x - this.rad <=
-      this.paddle.location.x + this.paddle.width / 2;
-    const xCheckMin =
-      this.location.x + this.rad >=
-      this.paddle.location.x - this.paddle.width / 2;
-
-    if (xCheckMax && xCheckMin) {
-      if (
-        this.location.y + this.rad >=
-        this.paddle.location.y - this.paddle.height / 2
-      ) {
-        this.rev("y");
-        this.location.y =
-          this.paddle.location.y -
-          this.paddle.height / 2 -
-          this.rad -
-          BugFixVal;
-      }
+  // prettier-ignore
+  collidePaddle() {
+    if (
+      this.location.x - this.rad < this.paddle.location.x + this.paddle.width / 2 &&
+      this.location.x + this.rad > this.paddle.location.x - this.paddle.width / 2 &&
+      this.location.y + this.rad > this.paddle.location.y - this.paddle.height / 2
+    ) {
+      gameState = "lose";
+      fill("red")
+      rect(500, 500, 50, 50)
+      
     }
   }
 
   bouncePillar() {
     for (let pillar of this.pillars) {
-      line(
-        pillar.location.x - pillar.width / 2,
-        pillar.location.y,
-        pillar.location.x - pillar.width / 2,
-        gameWindow.Y
-      );
-      line(
-        pillar.location.x + pillar.width / 2,
-        pillar.location.y,
-        pillar.location.x + pillar.width / 2,
-        gameWindow.Y
-      );
-
       // FIXME: there are some colliding issues with both of these ifs, need to find a way to have one or the other trigger, not both at some times
 
-      if (this.location.y + this.rad < pillar.height) {
-        if (
-          (this.location.x - this.rad > 0 &&
-            this.location.x + this.rad < pillar.width) ||
-          (this.location.x - this.rad >
-            gameWindow.getMiddleX() - pillar.width / 2 &&
-            this.location.x + this.rad <
-              gameWindow.getMiddleX() + pillar.width / 2) ||
-          (this.location.x - this.rad > gameWindow.X - pillar.width &&
-            this.location.x + this.rad < gameWindow.X)
-        )
-          this.rev("x");
-      }
+      if (
+        this.location.x - this.rad > pillar.location.x - pillar.width / 2 &&
+        this.location.x + this.rad < pillar.location.x + pillar.width / 2 &&
+        this.location.y + this.rad < pillar.height
+      )
+        this.rev("x");
 
       if (
-        this.location.x + this.rad >= pillar.location.x - pillar.width / 2 &&
-        this.location.x - this.rad <= pillar.location.x + pillar.width / 2 &&
-        this.location.y - this.rad <= pillar.location.y + pillar.height / 2
+        this.location.x + this.rad > pillar.location.x - pillar.width / 2 &&
+        this.location.x - this.rad < pillar.location.x + pillar.width / 2 &&
+        this.location.y - this.rad < pillar.height &&
+        this.location.y > pillar.height
       ) {
         this.rev("y");
-        fill("red");
-        rect(gameWindow.getMiddleX(), gameWindow.getMiddleY(), 50);
+        // fill("red");
+        // rect(gameWindow.getMiddleX(), gameWindow.getMiddleY(), 50);
       }
     }
   }
 
   bounceEdge() {
-    if (this.location.x + this.rad >= gameWindow.X) this.rev("x");
-    if (this.location.x - this.rad <= 0) this.rev("x");
-    if (this.location.y - this.rad <= 0) this.rev("y");
+    if (this.location.y - this.rad < 0) this.rev("y");
   }
 
   display() {
+    strokeWeight(2);
     fill(colors.gameObjects.ball);
     circle(this.location.x, this.location.y, this.D);
   }
 
   update() {
+    this.velocity.add(this.acceleration);
+    this.velocity.limit(this.topSpeed);
     this.location.add(this.velocity);
+    this.acceleration.mult(0);
+  }
+
+  applyForce(force) {
+    this.acceleration.add(force);
   }
 
   rev(coord) {
     this.velocity[coord] *= -1;
   }
 
-  belowBottom() {
-    return this.location.y - this.rad > gameWindow.Y;
+  resetLocation() {
+    this.location = createVector(
+      paddle.location.x,
+      paddle.location.y - paddle.height - this.D
+    );
+  }
+
+  resetSpeed() {
+    this.velocity = createVector();
+    this.acceleration = createVector();
+  }
+
+  outOfBounds() {
+    if (
+      this.location.x + this.rad > gameWindow.X ||
+      this.location.x - this.rad < 0 ||
+      this.location.y - this.rad > gameWindow.Y
+    ) {
+      shot = false;
+      this.resetSpeed();
+      this.resetLocation();
+    }
   }
 }
 
@@ -182,10 +186,57 @@ class Paddle {
     if (this.location.x + this.width / 2 > gameWindow.X)
       this.location.x = gameWindow.X - this.width / 2;
 
-    if (keyIsDown(LEFT_ARROW) || keyIsDown(keyCodesObject.A))
-      this.location.add(this.speed.left);
-    if (keyIsDown(RIGHT_ARROW) || keyIsDown(keyCodesObject.D))
-      this.location.add(this.speed.right);
+    if (keyIsDown(keyCodesObject.A)) this.location.add(this.speed.left);
+    if (keyIsDown(keyCodesObject.D)) this.location.add(this.speed.right);
+  }
+}
+
+class Cannon {
+  constructor(paddle, ball) {
+    this.spaceBarHit = 1;
+    this.angle = -PI / 2;
+    this.location = createVector(
+      paddle.location.x,
+      paddle.location.y - paddle.height
+    );
+    this.ball = ball;
+    this.gravity = createVector(0, 0.05);
+  }
+
+  resetGravity() {
+    this.gravity = createVector(0, 0);
+  }
+
+  shoot() {
+    if (keyIsDown(keyCodesObject.SPACE)) {
+      //  && this.spaceBarHit !== 0
+      this.gravity = createVector(0, 0.05);
+      shot = true;
+      this.spaceBarHit = 0;
+
+      const force = p5.Vector.fromAngle(this.angle);
+      console.log(force);
+      force.mult(10);
+      this.ball.applyForce(force);
+    }
+
+    if (shot) {
+      this.ball.applyForce(this.gravity);
+      this.ball.update();
+    }
+
+    this.spaceBarHit = 1;
+  }
+
+  rotate() {
+    if (keyIsDown(RIGHT_ARROW)) this.angle += 0.1;
+    if (keyIsDown(LEFT_ARROW)) this.angle -= 0.1;
+  }
+
+  display() {
+    fill(colors.gameObjects.cannon);
+    rect(this.location.x, this.location.y, 50, 75);
+    rotate(this.angle);
   }
 }
 
@@ -235,11 +286,12 @@ class Brick {
 // **************************************************** //
 
 /// Game Objects
-let paddle;
-let ball;
 let pillar_1;
 let pillar_2;
 let pillar_3;
+let paddle;
+let ball;
+let cannon;
 
 // **************************************************** //
 
@@ -267,6 +319,7 @@ function setup() {
 
   paddle = new Paddle();
   ball = new Ball(paddle, pillar_1, pillar_2, pillar_3);
+  cannon = new Cannon(paddle, ball);
 
   const bricksArr = [
     createBricks(pillars.width),
@@ -274,6 +327,7 @@ function setup() {
   ];
   bricksArr.shift();
   bricks = bricksArr.flat();
+
   scoreText.X = gameWindow.X - scoreText.textSize * 6;
   scoreText.Y = 50;
   gameStateText.X = gameWindow.getMiddleX() - gameStateText.textSize * 2;
@@ -308,13 +362,18 @@ function allTimeState() {
 function playingState() {
   ball.bounceEdge();
   ball.bouncePillar();
-  ball.bouncePaddle();
-  ball.update();
+  ball.collidePaddle();
+  ball.outOfBounds();
   ball.display();
+  // ball.update();
+
+  cannon.display();
+  cannon.shoot();
+  cannon.rotate();
 
   paddle.move();
 
-  if (ball.belowBottom()) gameState = "lose";
+  if (gameState === "lose") endGame();
   if (bricks.length === 0) gameState = "win";
 }
 
@@ -370,7 +429,9 @@ function manageBricks() {
     const brick = bricks[i];
 
     if (brick.isBallColliding(ball)) {
-      ball.rev("y");
+      cannon.resetGravity();
+      ball.resetSpeed();
+      ball.resetLocation();
       bricks.splice(i, 1);
       playerScore += brick.points;
     } else brick.display();
