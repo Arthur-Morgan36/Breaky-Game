@@ -17,6 +17,7 @@ const colors = {
     paddle: "#FFF",
     bricks: "#999",
     pillars: "#0D1117",
+    projectile: "##F76707",
   },
   text: {
     score: "#FFF",
@@ -60,30 +61,37 @@ class Ball {
   constructor(paddle, ...pillars) {
     this.D = 40;
     this.rad = 20;
-    this.location = createVector(
-      paddle.location.x,
-      paddle.location.y - paddle.height - this.D * 3.5
+    this.pos = createVector(
+      paddle.pos.x,
+      paddle.pos.y - paddle.height - this.D * 3.5
     );
     this.velocity = createVector();
     this.acceleration = createVector();
-    this.topSpeed = 10;
+    this.topSpeed = 15;
+
+    this.speed = {
+      right: createVector(gameWindow.X / 100, 0),
+      left: createVector(-gameWindow.X / 100, 0),
+    };
 
     this.paddle = paddle;
     this.pillars = pillars;
+
+    this.trail = [
+      {
+        x: this.pos.x,
+        y: this.pos.y,
+      },
+    ];
   }
 
   // prettier-ignore
   collidePaddle() {
     if (
-      this.location.x - this.rad < this.paddle.location.x + this.paddle.width / 2 &&
-      this.location.x + this.rad > this.paddle.location.x - this.paddle.width / 2 &&
-      this.location.y + this.rad > this.paddle.location.y - this.paddle.height / 2
-    ) {
-      gameState = "lose";
-      fill("red")
-      rect(500, 500, 50, 50)
-      
-    }
+      this.pos.x - this.rad < this.paddle.pos.x + this.paddle.width / 2 &&
+      this.pos.x + this.rad > this.paddle.pos.x - this.paddle.width / 2 &&
+      this.pos.y + this.rad > this.paddle.pos.y - this.paddle.height / 2
+    ) gameState = "lose";
   }
 
   bouncePillar() {
@@ -91,17 +99,17 @@ class Ball {
       // FIXME: there are some colliding issues with both of these ifs, need to find a way to have one or the other trigger, not both at some times
 
       if (
-        this.location.x - this.rad > pillar.location.x - pillar.width / 2 &&
-        this.location.x + this.rad < pillar.location.x + pillar.width / 2 &&
-        this.location.y + this.rad < pillar.height
+        this.pos.x - this.rad > pillar.pos.x - pillar.width / 2 &&
+        this.pos.x + this.rad < pillar.pos.x + pillar.width / 2 &&
+        this.pos.y + this.rad < pillar.height
       )
         this.rev("x");
 
       if (
-        this.location.x + this.rad > pillar.location.x - pillar.width / 2 &&
-        this.location.x - this.rad < pillar.location.x + pillar.width / 2 &&
-        this.location.y - this.rad < pillar.height &&
-        this.location.y > pillar.height
+        this.pos.x + this.rad > pillar.pos.x - pillar.width / 2 &&
+        this.pos.x - this.rad < pillar.pos.x + pillar.width / 2 &&
+        this.pos.y - this.rad < pillar.height &&
+        this.pos.y > pillar.height
       ) {
         this.rev("y");
         // fill("red");
@@ -111,20 +119,52 @@ class Ball {
   }
 
   bounceEdge() {
-    if (this.location.y - this.rad < 0) this.rev("y");
+    if (this.pos.y - this.rad < 0) this.rev("y");
   }
 
   display() {
     strokeWeight(2);
     fill(colors.gameObjects.ball);
-    circle(this.location.x, this.location.y, this.D);
+    circle(this.pos.x, this.pos.y, this.D);
   }
 
   update() {
     this.velocity.add(this.acceleration);
     this.velocity.limit(this.topSpeed);
-    this.location.add(this.velocity);
+    this.pos.add(this.velocity);
     this.acceleration.mult(0);
+
+    if (frameCount % 5 === 0) this.trail.push({ x: this.pos.x, y: this.pos.y });
+  }
+
+  updatePos() {
+    if (!shot) {
+      if (this.pos.x - this.D * 2 < 0) this.pos.x = this.D * 2;
+      if (this.pos.x + this.D * 2 > gameWindow.X)
+        this.pos.x = gameWindow.X - this.D * 2;
+
+      if (keyIsDown(keyCodesObject.A)) this.pos.add(this.speed.left);
+      if (keyIsDown(keyCodesObject.D)) this.pos.add(this.speed.right);
+
+      this.trail = [
+        {
+          x: this.pos.x,
+          y: this.pos.y,
+        },
+      ];
+    }
+  }
+
+  traceTrajectory() {
+    if (shot) {
+      for (let i = 0; i < this.trail.length; i++) {
+        push();
+        noStroke();
+        fill("#FFF");
+        circle(this.trail[i].x, this.trail[i].y, this.D);
+        pop();
+      }
+    }
   }
 
   applyForce(force) {
@@ -135,10 +175,10 @@ class Ball {
     this.velocity[coord] *= -1;
   }
 
-  resetLocation() {
-    this.location = createVector(
-      paddle.location.x,
-      paddle.location.y - paddle.height - this.D * 3.5
+  resetPos() {
+    this.pos = createVector(
+      paddle.pos.x,
+      paddle.pos.y - paddle.height - this.D * 3.5
     );
   }
 
@@ -149,13 +189,13 @@ class Ball {
 
   outOfBounds() {
     if (
-      this.location.x + this.rad > gameWindow.X ||
-      this.location.x - this.rad < 0 ||
-      this.location.y - this.rad > gameWindow.Y
+      this.pos.x + this.rad > gameWindow.X ||
+      this.pos.x - this.rad < 0 ||
+      this.pos.y - this.rad > gameWindow.Y
     ) {
       shot = false;
       this.resetSpeed();
-      this.resetLocation();
+      this.resetPos();
     }
   }
 }
@@ -165,7 +205,7 @@ class Paddle {
     this.width = 150;
     this.height = 25;
     this.YOffset = 35;
-    this.location = createVector(
+    this.pos = createVector(
       gameWindow.getMiddleX(),
       gameWindow.Y - this.YOffset
     );
@@ -178,16 +218,16 @@ class Paddle {
 
   display() {
     fill(colors.gameObjects.paddle);
-    rect(this.location.x, this.location.y, this.width, this.height);
+    rect(this.pos.x, this.pos.y, this.width, this.height);
   }
 
   move() {
-    if (this.location.x - this.width / 2 < 0) this.location.x = this.width / 2;
-    if (this.location.x + this.width / 2 > gameWindow.X)
-      this.location.x = gameWindow.X - this.width / 2;
+    if (this.pos.x - this.width / 2 <= 0) this.pos.x = this.width / 2;
+    if (this.pos.x + this.width / 2 >= gameWindow.X)
+      this.pos.x = gameWindow.X - this.width / 2;
 
-    if (keyIsDown(keyCodesObject.A)) this.location.add(this.speed.left);
-    if (keyIsDown(keyCodesObject.D)) this.location.add(this.speed.right);
+    if (keyIsDown(keyCodesObject.A)) this.pos.add(this.speed.left);
+    if (keyIsDown(keyCodesObject.D)) this.pos.add(this.speed.right);
   }
 }
 
@@ -198,10 +238,16 @@ class Cannon {
     this.height = 150;
     this.width = 50;
 
-    this.location = createVector(
-      paddle.location.x,
-      paddle.location.y - paddle.height / 2 - this.height / 2
+    this.pos = createVector(
+      paddle.pos.x,
+      paddle.pos.y - paddle.height / 2 - this.height / 2
     );
+
+    this.speed = {
+      right: createVector(gameWindow.X / 100, 0),
+      left: createVector(-gameWindow.X / 100, 0),
+    };
+
     this.ball = ball;
     this.gravity = createVector(0, 0.05);
   }
@@ -211,14 +257,13 @@ class Cannon {
   }
 
   shoot() {
-    if (keyIsDown(keyCodesObject.SPACE)) {
-      //  && this.spaceBarHit !== 0
+    if (keyIsDown(keyCodesObject.SPACE) && this.spaceBarHit !== 0) {
       this.gravity = createVector(0, 0.05);
       shot = true;
       this.spaceBarHit = 0;
 
       const force = p5.Vector.fromAngle(this.angle);
-      force.mult(10);
+      force.mult(15);
       this.ball.applyForce(force);
     }
 
@@ -227,59 +272,106 @@ class Cannon {
       this.ball.update();
     }
 
-    this.spaceBarHit = 1;
+    if (!shot) this.spaceBarHit = 1;
   }
 
   rotate() {
-    if (keyIsDown(LEFT_ARROW)) this.angle -= 0.1;
-    if (keyIsDown(RIGHT_ARROW)) this.angle += 0.1;
+    const maxLeftAngle = rational(-2.320796326794896);
+    const minLeftAngle = rational(-0.805454889999999);
+
+    if (this.angle <= maxLeftAngle) this.angle = maxLeftAngle;
+    if (this.angle >= minLeftAngle) this.angle = minLeftAngle;
+
+    if (keyIsDown(LEFT_ARROW)) this.angle -= 0.15;
+    if (keyIsDown(RIGHT_ARROW)) this.angle += 0.15;
+  }
+
+  update() {
+    if (this.pos.x - this.width * 1.5 < 0) this.pos.x = this.width * 1.5;
+    if (this.pos.x + this.width * 1.5 > gameWindow.X)
+      this.pos.x = gameWindow.X - this.width * 1.5;
+
+    if (keyIsDown(keyCodesObject.A)) this.pos.add(this.speed.left);
+    if (keyIsDown(keyCodesObject.D)) this.pos.add(this.speed.right);
   }
 
   display() {
     fill(colors.gameObjects.cannon);
 
-    push();
-    translate(this.location.x, this.location.y); // translating is essential for rotation
+    // push();
+    translate(this.pos.x, this.pos.y); // translating is essential for rotation
     rotate(this.angle);
     rect(0, 0, this.height, this.width);
-    pop();
+    // pop();
   }
 }
 
 class Pillar {
-  constructor(location, width, height) {
-    this.location = location;
+  constructor(pos, width, height) {
+    this.pos = pos;
     this.width = width;
     this.height = height;
   }
 
   display() {
     fill(colors.gameObjects.pillars);
-    rect(this.location.x, this.location.y, this.width, this.height);
-    // line(this.location.x - this.width / 2, this.location.y, this.location.x - this.width / 2, gameWindow.Y);
-    // line(this.location.x + this.width / 2, this.location.y, this.location.x + this.width / 2, gameWindow.Y);
+    rect(this.pos.x, this.pos.y, this.width, this.height);
+    // line(this.pos.x - this.width / 2, this.pos.y, this.pos.x - this.width / 2, gameWindow.Y);
+    // line(this.pos.x + this.width / 2, this.pos.y, this.pos.x + this.width / 2, gameWindow.Y);
+  }
+}
+
+class Projectile {
+  constructor(brick) {
+    // Brick passed in must have this.shoots = true using a for loop I'll create the projectiles
+    this.width = 10;
+    this.height = 15;
+
+    this.pos = createVector(brick.pos.x, brick.pos.y);
+    this.initialY = brick.pos.y;
+  }
+
+  display() {
+    fill(colors.gameObjects.projectile);
+    rect(this.pos.x, this.pos.y, this.width, this.height);
+  }
+
+  move() {
+    if (this.pos.y > gameWindow.Y) this.pos.y = this.initialY;
+    this.pos.y++;
+  }
+
+  hitsPaddle(paddle) {
+    if (
+      paddle.pos.x + paddle.width / 2 >= this.pos.x - this.width / 2 &&
+      paddle.pos.x - paddle.width / 2 <= this.pos.x + this.width / 2 &&
+      paddle.pos.y + paddle.height / 2 >= this.pos.y - this.height / 2 &&
+      paddle.pos.y - paddle.height / 2 <= this.pos.y + this.height / 2
+    )
+      gameState = "lose";
   }
 }
 
 class Brick {
-  constructor(location, width, height) {
-    this.location = location;
+  constructor(pos, width, height) {
+    this.pos = pos;
     this.width = width;
     this.height = height;
     this.points = 1;
+    this.shoots = Math.random() > 0.5; // Does the brick shoot a projectile towards the player?
   }
 
   display() {
     fill(colors.gameObjects.bricks);
-    rect(this.location.x, this.location.y, this.width, this.height);
+    rect(this.pos.x, this.pos.y, this.width, this.height);
   }
 
   isBallColliding(ball) {
     if (
-      ball.location.x + ball.D / 2 >= this.location.x - this.width / 2 &&
-      ball.location.x - ball.D / 2 <= this.location.x + this.width / 2 &&
-      ball.location.y + ball.D / 2 >= this.location.y - this.height / 2 &&
-      ball.location.y - ball.D / 2 <= this.location.y + this.height / 2
+      ball.pos.x + ball.D / 2 >= this.pos.x - this.width / 2 &&
+      ball.pos.x - ball.D / 2 <= this.pos.x + this.width / 2 &&
+      ball.pos.y + ball.D / 2 >= this.pos.y - this.height / 2 &&
+      ball.pos.y - ball.D / 2 <= this.pos.y + this.height / 2
     )
       return true;
   }
@@ -327,7 +419,7 @@ function setup() {
     createBricks(pillars.width),
     createBricks(gameWindow.getMiddleX() + pillars.width / 2),
   ];
-  bricksArr.shift();
+  bricksArr.shift(); // For some reason I was getting twice the amount of bricks I needed to get
   bricks = bricksArr.flat();
 
   scoreText.X = gameWindow.X - scoreText.textSize * 6;
@@ -373,10 +465,15 @@ function playingState() {
   ball.collidePaddle();
   ball.outOfBounds();
   ball.display();
+  ball.updatePos();
+  ball.traceTrajectory();
+
+  createProjectiles();
 
   cannon.display();
   cannon.shoot();
   cannon.rotate();
+  cannon.update();
 
   paddle.move();
 
@@ -443,6 +540,22 @@ function createBricks(xOffSet) {
 }
 
 /**
+ * Creates the projectiles and calls their appropriate methods. It also deals with bricks getting destroyed on the map.
+ */
+function createProjectiles() {
+  const enemyBricks = bricks.filter((x) => x.shoots === true);
+
+  // FIXME: Projectiles aren't moving but they are displaying, not sure if the hitspaddle methods works or not too.
+
+  for (let brick of enemyBricks) {
+    let projectile = new Projectile(brick);
+    projectile.display();
+    projectile.move();
+    projectile.hitsPaddle(paddle);
+  }
+}
+
+/**
  * Manages the briks, removes bricks that have been hit by the ball and otherwise displays the remaining bricks. Additionally it's used to reset the gravity of the cannonball to remove the initial velocity at which the ball might be thrown after a hit on a brick.
  */
 function manageBricks() {
@@ -450,9 +563,11 @@ function manageBricks() {
     const brick = bricks[i];
 
     if (brick.isBallColliding(ball)) {
+      shot = false;
+
       cannon.resetGravity();
       ball.resetSpeed();
-      ball.resetLocation();
+      ball.resetPos();
 
       bricks.splice(i, 1);
       playerScore += brick.points;
@@ -482,4 +597,13 @@ function mousePressed() {
  */
 function randomColor() {
   return "#" + Math.trunc(Math.random() * 0xfff).toString(16);
+}
+
+/**
+ * Turns an irrational number into a rational number with 2 decimal points.
+ * @param { number } num
+ * @returns The irrational number made rational
+ */
+function rational(num) {
+  return Number(num.toFixed(2));
 }
