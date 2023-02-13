@@ -17,7 +17,7 @@ const colors = {
     paddle: "#FFF",
     bricks: "#999",
     pillars: "#0D1117",
-    projectile: "##F76707",
+    projectile: "#F76707",
   },
   text: {
     score: "#FFF",
@@ -27,7 +27,7 @@ const colors = {
 
 const pillars = {
   width: 250,
-  height: 300,
+  height: 330,
 };
 
 const gameStateText = {
@@ -70,8 +70,8 @@ class Ball {
     this.topSpeed = 15;
 
     this.speed = {
-      right: createVector(gameWindow.X / 100, 0),
-      left: createVector(-gameWindow.X / 100, 0),
+      right: createVector(gameWindow.X / 120, 0),
+      left: createVector(-gameWindow.X / 120, 0),
     };
 
     this.paddle = paddle;
@@ -95,26 +95,37 @@ class Ball {
   }
 
   bouncePillar() {
-    for (let pillar of this.pillars) {
-      // FIXME: there are some colliding issues with both of these ifs, need to find a way to have one or the other trigger, not both at some times
+    const normalPillars = this.pillars.filter((x) => x.type === "normal");
+    const protectionPillars = this.pillars.filter(
+      (x) => x.type === "protection"
+    );
 
+    for (let pillar of protectionPillars) {
       if (
-        this.pos.x - this.rad > pillar.pos.x - pillar.width / 2 &&
-        this.pos.x + this.rad < pillar.pos.x + pillar.width / 2 &&
-        this.pos.y + this.rad < pillar.height
+        this.pos.x + this.rad >
+          pillar.pos.x - pillar.protectionPillarWidth / 2 &&
+        this.pos.x - this.rad <
+          pillar.pos.x + pillar.protectionPillarWidth / 2 &&
+        this.pos.y - this.rad < pillar.pos.y + pillar.protectionPillarHeight / 2
+      )
+        this.rev("y");
+    }
+
+    for (let pillar of normalPillars) {
+      if (
+        this.pos.x + this.rad > pillar.pos.x - pillar.normalPillarWidth / 2 &&
+        this.pos.x - this.rad < pillar.pos.x + pillar.normalPillarWidth / 2 &&
+        this.pos.y + this.rad < pillar.normalPillarHeight
       )
         this.rev("x");
 
       if (
-        this.pos.x + this.rad > pillar.pos.x - pillar.width / 2 &&
-        this.pos.x - this.rad < pillar.pos.x + pillar.width / 2 &&
-        this.pos.y - this.rad < pillar.height &&
-        this.pos.y > pillar.height
-      ) {
+        this.pos.x + this.rad > pillar.pos.x - pillar.normalPillarWidth / 2 &&
+        this.pos.x - this.rad < pillar.pos.x + pillar.normalPillarWidth / 2 &&
+        this.pos.y - this.rad < pillar.normalPillarHeight &&
+        this.pos.y > pillar.normalPillarHeight
+      )
         this.rev("y");
-        // fill("red");
-        // rect(gameWindow.getMiddleX(), gameWindow.getMiddleY(), 50);
-      }
     }
   }
 
@@ -211,8 +222,8 @@ class Paddle {
     );
 
     this.speed = {
-      right: createVector(gameWindow.X / 100, 0),
-      left: createVector(-gameWindow.X / 100, 0),
+      right: createVector(gameWindow.X / 120, 0),
+      left: createVector(-gameWindow.X / 120, 0),
     };
   }
 
@@ -244,8 +255,8 @@ class Cannon {
     );
 
     this.speed = {
-      right: createVector(gameWindow.X / 100, 0),
-      left: createVector(-gameWindow.X / 100, 0),
+      right: createVector(gameWindow.X / 120, 0),
+      left: createVector(-gameWindow.X / 120, 0),
     };
 
     this.ball = ball;
@@ -307,15 +318,33 @@ class Cannon {
 }
 
 class Pillar {
-  constructor(pos, width, height) {
+  constructor(pos, type) {
     this.pos = pos;
-    this.width = width;
-    this.height = height;
+    this.type = type;
+
+    this.normalPillarWidth = pillars.width;
+    this.normalPillarHeight = pillars.height;
+    this.protectionPillarWidth = gameWindow.getMiddleX() - pillars.width * 1.5;
+    this.protectionPillarHeight = 60;
   }
 
   display() {
     fill(colors.gameObjects.pillars);
-    rect(this.pos.x, this.pos.y, this.width, this.height);
+    if (this.type === "normal")
+      rect(
+        this.pos.x,
+        this.pos.y,
+        this.normalPillarWidth,
+        this.normalPillarHeight
+      );
+    if (this.type === "protection")
+      rect(
+        this.pos.x,
+        this.pos.y,
+        this.protectionPillarWidth,
+        this.protectionPillarHeight
+      );
+
     // line(this.pos.x - this.width / 2, this.pos.y, this.pos.x - this.width / 2, gameWindow.Y);
     // line(this.pos.x + this.width / 2, this.pos.y, this.pos.x + this.width / 2, gameWindow.Y);
   }
@@ -323,22 +352,27 @@ class Pillar {
 
 class Projectile {
   constructor(brick) {
-    // Brick passed in must have this.shoots = true using a for loop I'll create the projectiles
     this.width = 10;
     this.height = 15;
 
     this.pos = createVector(brick.pos.x, brick.pos.y);
+    this.velocity = createVector(0, 1);
     this.initialY = brick.pos.y;
   }
 
   display() {
+    push();
+    noStroke();
     fill(colors.gameObjects.projectile);
     rect(this.pos.x, this.pos.y, this.width, this.height);
+    pop();
   }
 
   move() {
-    if (this.pos.y > gameWindow.Y) this.pos.y = this.initialY;
-    this.pos.y++;
+    if (this.pos.y > gameWindow.Y) {
+      this.pos.x = gameWindow.getMiddleX();
+      this.pos.y = this.initialY;
+    } else this.pos.add(this.velocity);
   }
 
   hitsPaddle(paddle) {
@@ -348,7 +382,7 @@ class Projectile {
       paddle.pos.y + paddle.height / 2 >= this.pos.y - this.height / 2 &&
       paddle.pos.y - paddle.height / 2 <= this.pos.y + this.height / 2
     )
-      gameState = "lose";
+      return true;
   }
 }
 
@@ -359,6 +393,7 @@ class Brick {
     this.height = height;
     this.points = 1;
     this.shoots = Math.random() > 0.5; // Does the brick shoot a projectile towards the player?
+    this.isDestroyed = false;
   }
 
   display() {
@@ -383,6 +418,9 @@ class Brick {
 let pillar_1;
 let pillar_2;
 let pillar_3;
+let pillar_4;
+let pillar_5;
+
 let paddle;
 let ball;
 let cannon;
@@ -397,22 +435,31 @@ function setup() {
 
   pillar_1 = new Pillar(
     createVector(pillars.width / 2, pillars.height / 2),
-    pillars.width,
-    pillars.height
+    "normal"
   );
   pillar_2 = new Pillar(
     createVector(gameWindow.getMiddleX(), pillars.height / 2),
-    pillars.width,
-    pillars.height
+    "normal"
   );
   pillar_3 = new Pillar(
     createVector(gameWindow.X - pillars.width / 2, pillars.height / 2),
-    pillars.width,
-    pillars.height
+    "normal"
+  );
+
+  pillar_4 = new Pillar(
+    createVector((gameWindow.getMiddleX() + pillars.width / 2) / 2, 90),
+    "protection"
+  );
+  pillar_5 = new Pillar(
+    createVector(
+      gameWindow.X - gameWindow.getMiddleX() / 2 - pillars.width / 4,
+      90
+    ),
+    "protection"
   );
 
   paddle = new Paddle();
-  ball = new Ball(paddle, pillar_1, pillar_2, pillar_3);
+  ball = new Ball(paddle, pillar_1, pillar_2, pillar_3, pillar_4, pillar_5);
   cannon = new Cannon(paddle, ball);
 
   const bricksArr = [
@@ -421,6 +468,8 @@ function setup() {
   ];
   bricksArr.shift(); // For some reason I was getting twice the amount of bricks I needed to get
   bricks = bricksArr.flat();
+
+  projectiles = createProjectiles();
 
   scoreText.X = gameWindow.X - scoreText.textSize * 6;
   scoreText.Y = 50;
@@ -448,10 +497,13 @@ function draw() {
 function allTimeState() {
   paddle.display();
   manageBricks();
+  // manageProjectiles();
 
   pillar_1.display();
   pillar_2.display();
   pillar_3.display();
+  pillar_4.display();
+  pillar_5.display();
 
   displayScore();
 }
@@ -521,7 +573,8 @@ function createBricks(xOffSet) {
   };
 
   let brick;
-  const yOffSet = brickSize.height * 3;
+  const yOffSet = brickSize.height * 4;
+
   for (let row = 0; row < rows; row++) {
     for (let i = 0; i < bricksPerRow; i++) {
       brick = new Brick(
@@ -539,24 +592,25 @@ function createBricks(xOffSet) {
   return bricks;
 }
 
+let projectiles = [];
+
 /**
  * Creates the projectiles and calls their appropriate methods. It also deals with bricks getting destroyed on the map.
  */
 function createProjectiles() {
   const enemyBricks = bricks.filter((x) => x.shoots === true);
 
-  // FIXME: Projectiles aren't moving but they are displaying, not sure if the hitspaddle methods works or not too.
-
   for (let brick of enemyBricks) {
     let projectile = new Projectile(brick);
     projectile.display();
-    projectile.move();
-    projectile.hitsPaddle(paddle);
+    projectiles.push(projectile);
   }
+
+  return projectiles;
 }
 
 /**
- * Manages the briks, removes bricks that have been hit by the ball and otherwise displays the remaining bricks. Additionally it's used to reset the gravity of the cannonball to remove the initial velocity at which the ball might be thrown after a hit on a brick.
+ * Manages the bricks, removes bricks that have been hit by the ball and otherwise displays the remaining bricks. Additionally it's used to reset the gravity of the cannonball to remove the initial velocity at which the ball might be thrown after a hit on a brick.
  */
 function manageBricks() {
   for (let i = bricks.length - 1; i >= 0; i--) {
@@ -572,6 +626,18 @@ function manageBricks() {
       bricks.splice(i, 1);
       playerScore += brick.points;
     } else brick.display();
+  }
+}
+
+function manageProjectiles() {
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const projectile = projectiles[i];
+
+    if (projectile.hitsPaddle(paddle)) gameState = "lose";
+    else {
+      projectile.display();
+      projectile.move();
+    }
   }
 }
 
