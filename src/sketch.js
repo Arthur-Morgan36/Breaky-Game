@@ -25,6 +25,8 @@ const colors = {
   },
 };
 
+let movementSpeed = {};
+
 const pillars = {
   width: 250,
   height: 330,
@@ -63,26 +65,18 @@ class Ball {
     this.rad = 20;
     this.pos = createVector(
       paddle.pos.x,
-      paddle.pos.y - paddle.height - this.D * 3.5
+      paddle.pos.y - paddle.height / 2 - this.rad
     );
     this.velocity = createVector();
     this.acceleration = createVector();
     this.topSpeed = 15;
 
-    this.speed = {
-      right: createVector(gameWindow.X / 120, 0),
-      left: createVector(-gameWindow.X / 120, 0),
-    };
+    this.speed = movementSpeed;
 
     this.paddle = paddle;
     this.pillars = pillars;
 
-    this.trail = [
-      {
-        x: this.pos.x,
-        y: this.pos.y,
-      },
-    ];
+    this.trail = [];
   }
 
   // prettier-ignore
@@ -145,14 +139,19 @@ class Ball {
     this.pos.add(this.velocity);
     this.acceleration.mult(0);
 
-    if (frameCount % 5 === 0) this.trail.push({ x: this.pos.x, y: this.pos.y });
+    if (frameCount % 5 === 0)
+      this.trail.push({
+        x: this.pos.x,
+        y: this.pos.y,
+      });
   }
 
   updatePos() {
     if (!shot) {
-      if (this.pos.x - this.D * 2 < 0) this.pos.x = this.D * 2;
-      if (this.pos.x + this.D * 2 > gameWindow.X)
-        this.pos.x = gameWindow.X - this.D * 2;
+      if (this.pos.x - this.paddle.width / 2 < 0)
+        this.pos.x = this.paddle.width / 2;
+      if (this.pos.x + this.paddle.width / 2 > gameWindow.X)
+        this.pos.x = gameWindow.X - this.paddle.width / 2;
 
       if (keyIsDown(keyCodesObject.A)) this.pos.add(this.speed.left);
       if (keyIsDown(keyCodesObject.D)) this.pos.add(this.speed.right);
@@ -168,11 +167,11 @@ class Ball {
 
   traceTrajectory() {
     if (shot) {
-      for (let i = 0; i < this.trail.length; i++) {
+      for (let i = 1; i < this.trail.length; i++) {
         push();
         noStroke();
         fill("#FFF");
-        circle(this.trail[i].x, this.trail[i].y, this.D);
+        circle(this.trail[i].x, this.trail[i].y, this.D * 0.75);
         pop();
       }
     }
@@ -189,7 +188,7 @@ class Ball {
   resetPos() {
     this.pos = createVector(
       paddle.pos.x,
-      paddle.pos.y - paddle.height - this.D * 3.5
+      paddle.pos.y - paddle.height / 2 - this.rad
     );
   }
 
@@ -213,23 +212,20 @@ class Ball {
 
 class Paddle {
   constructor() {
-    this.width = 150;
-    this.height = 25;
+    this.width = 175;
+    this.height = 30;
     this.YOffset = 35;
     this.pos = createVector(
       gameWindow.getMiddleX(),
       gameWindow.Y - this.YOffset
     );
 
-    this.speed = {
-      right: createVector(gameWindow.X / 120, 0),
-      left: createVector(-gameWindow.X / 120, 0),
-    };
+    this.speed = movementSpeed;
   }
 
   display() {
     fill(colors.gameObjects.paddle);
-    rect(this.pos.x, this.pos.y, this.width, this.height);
+    rect(this.pos.x, this.pos.y, this.width, this.height, 10);
   }
 
   move() {
@@ -247,19 +243,17 @@ class Cannon {
     this.spaceBarHit = 1;
     this.angle = -PI / 2; // Minus because the Y axis is reversed. Divided by 2 to be poiting straight at the top
     this.height = 150;
-    this.width = 50;
+    this.width = ball.D;
 
     this.pos = createVector(
       paddle.pos.x,
-      paddle.pos.y - paddle.height / 2 - this.height / 2
+      paddle.pos.y - paddle.height - this.height / 2 - ball.rad
     );
 
-    this.speed = {
-      right: createVector(gameWindow.X / 120, 0),
-      left: createVector(-gameWindow.X / 120, 0),
-    };
-
+    this.speed = movementSpeed;
+    this.paddle = paddle;
     this.ball = ball;
+
     this.gravity = createVector(0, 0.05);
   }
 
@@ -297,34 +291,37 @@ class Cannon {
     if (keyIsDown(RIGHT_ARROW)) this.angle += 0.15;
   }
 
-  update() {
-    if (this.pos.x - this.width * 1.5 < 0) this.pos.x = this.width * 1.5;
-    if (this.pos.x + this.width * 1.5 > gameWindow.X)
-      this.pos.x = gameWindow.X - this.width * 1.5;
-
-    if (keyIsDown(keyCodesObject.A)) this.pos.add(this.speed.left);
-    if (keyIsDown(keyCodesObject.D)) this.pos.add(this.speed.right);
-  }
-
   display() {
     fill(colors.gameObjects.cannon);
+    let translationXVal = this.paddle.pos.x;
+    let translationYVal =
+      this.paddle.pos.y - this.paddle.height / 2 - this.ball.rad;
 
-    // push();
-    translate(this.pos.x, this.pos.y); // translating is essential for rotation
+    push();
+    rectMode(CORNER); // Switching rectModes only for the cannon to allow the cannon to rotate around the cannonball
+    if (this.pos.x - this.width / 2 - this.paddle.width / 2 < 0)
+      translationXVal += 5;
+    if (this.pos.x + this.width / 2 + this.paddle.width / 2 > gameWindow.X)
+      translationXVal -= 5;
+
+    translate(translationXVal, translationYVal); // translating is essential for rotation
     rotate(this.angle);
-    rect(0, 0, this.height, this.width);
-    // pop();
+    rect(5, -20, this.height, this.width, 5, 0, 0, 5);
+    pop();
   }
 }
 
 class Pillar {
-  constructor(pos, type) {
+  constructor(pos, type, direction = "none") {
     this.pos = pos;
     this.type = type;
+    this.direction = direction;
+    this.retreatSpeed = 20;
 
     this.normalPillarWidth = pillars.width;
     this.normalPillarHeight = pillars.height;
-    this.protectionPillarWidth = gameWindow.getMiddleX() - pillars.width * 1.5;
+    this.protectionPillarWidth =
+      gameWindow.getMiddleX() - pillars.width * 1.5 + bugFixVal * 2;
     this.protectionPillarHeight = 60;
   }
 
@@ -335,18 +332,48 @@ class Pillar {
         this.pos.x,
         this.pos.y,
         this.normalPillarWidth,
-        this.normalPillarHeight
+        this.normalPillarHeight,
+        0,
+        0,
+        5,
+        5
       );
-    if (this.type === "protection")
+
+    if (this.type === "protection") {
+      push();
+      noStroke();
       rect(
         this.pos.x,
         this.pos.y,
         this.protectionPillarWidth,
         this.protectionPillarHeight
       );
+      pop();
+    }
 
-    // line(this.pos.x - this.width / 2, this.pos.y, this.pos.x - this.width / 2, gameWindow.Y);
-    // line(this.pos.x + this.width / 2, this.pos.y, this.pos.x + this.width / 2, gameWindow.Y);
+    push();
+    stroke("#000");
+    line(
+      this.normalPillarWidth,
+      this.protectionPillarHeight,
+      gameWindow.getMiddleX() - this.normalPillarWidth / 2,
+      this.protectionPillarHeight
+    );
+
+    line(
+      gameWindow.getMiddleX() + this.normalPillarWidth / 2,
+      this.protectionPillarHeight,
+      gameWindow.X - this.normalPillarWidth,
+      this.protectionPillarHeight
+    );
+    pop();
+  }
+
+  retreat() {
+    if (this.type === "protection") {
+      if (this.direction === "left") this.pos.add(-this.retreatSpeed);
+      if (this.direction === "right") this.pos.add(this.retreatSpeed);
+    }
   }
 }
 
@@ -364,7 +391,7 @@ class Projectile {
     push();
     noStroke();
     fill(colors.gameObjects.projectile);
-    rect(this.pos.x, this.pos.y, this.width, this.height);
+    rect(this.pos.x, this.pos.y, this.width, this.height, 0, 0, 5, 5);
     pop();
   }
 
@@ -433,6 +460,11 @@ function setup() {
   gameWindow.X = displayWidth;
   gameWindow.Y = displayHeight;
 
+  movementSpeed = {
+    right: createVector(gameWindow.X / 120, 0),
+    left: createVector(-gameWindow.X / 120, 0),
+  };
+
   pillar_1 = new Pillar(
     createVector(pillars.width / 2, pillars.height / 2),
     "normal"
@@ -448,14 +480,16 @@ function setup() {
 
   pillar_4 = new Pillar(
     createVector((gameWindow.getMiddleX() + pillars.width / 2) / 2, 90),
-    "protection"
+    "protection",
+    "left"
   );
   pillar_5 = new Pillar(
     createVector(
       gameWindow.X - gameWindow.getMiddleX() / 2 - pillars.width / 4,
       90
     ),
-    "protection"
+    "protection",
+    "right"
   );
 
   paddle = new Paddle();
@@ -525,12 +559,16 @@ function playingState() {
   cannon.display();
   cannon.shoot();
   cannon.rotate();
-  cannon.update();
 
   paddle.move();
 
   if (gameState === "lose") endGame();
-  if (bricks.length === 0) gameState = "win";
+  if (bricks.length === 0) {
+    pillar_4.retreat();
+    pillar_5.retreat();
+
+    gameState = "win"; // this needs to be delayed until the protection pillars have retreated and the prisoners are out
+  }
 }
 
 /**
@@ -672,4 +710,14 @@ function randomColor() {
  */
 function rational(num) {
   return Number(num.toFixed(2));
+}
+
+// !! Not so sure if I'm going to refactor the code with this function, keep in mind that the $ sign doesn't look that neat and that descriptive
+/**
+ * A simple function that divides a number by 2
+ * @param { number } val Value we'd like to divide
+ * @returns val / 2
+ */
+function $(val) {
+  return val / 2;
 }
