@@ -316,7 +316,7 @@ class Pillar {
     this.pos = pos;
     this.type = type;
     this.direction = direction;
-    this.retreatSpeed = 20;
+    this.retreatSpeed = createVector(20, 0);
 
     this.normalPillarWidth = pillars.width;
     this.normalPillarHeight = pillars.height;
@@ -382,9 +382,13 @@ class Projectile {
     this.width = 10;
     this.height = 15;
 
-    this.pos = createVector(brick.pos.x, brick.pos.y);
-    this.velocity = createVector(0, 1);
-    this.initialY = brick.pos.y;
+    this.pos = createVector(brick.pos.x, brick.pos.y + this.height / 2);
+    // this.pos = createVector(brick.pos.x, brick.pos.y);
+    this.velocity = createVector(0, 1); // Increase speed once testing is done;
+    this.newPos = createVector(
+      gameWindow.getMiddleX(),
+      pillars.height - this.height / 2
+    );
   }
 
   display() {
@@ -396,10 +400,8 @@ class Projectile {
   }
 
   move() {
-    if (this.pos.y > gameWindow.Y) {
-      this.pos.x = gameWindow.getMiddleX();
-      this.pos.y = this.initialY;
-    } else this.pos.add(this.velocity);
+    if (this.pos.y > gameWindow.Y) this.pos = this.newPos;
+    else this.pos.add(this.velocity);
   }
 
   hitsPaddle(paddle) {
@@ -531,7 +533,6 @@ function draw() {
 function allTimeState() {
   paddle.display();
   manageBricks();
-  // manageProjectiles();
 
   pillar_1.display();
   pillar_2.display();
@@ -554,13 +555,13 @@ function playingState() {
   ball.updatePos();
   ball.traceTrajectory();
 
-  createProjectiles();
-
   cannon.display();
   cannon.shoot();
   cannon.rotate();
 
   paddle.move();
+
+  manageProjectiles();
 
   if (gameState === "lose") endGame();
   if (bricks.length === 0) {
@@ -640,7 +641,6 @@ function createProjectiles() {
 
   for (let brick of enemyBricks) {
     let projectile = new Projectile(brick);
-    projectile.display();
     projectiles.push(projectile);
   }
 
