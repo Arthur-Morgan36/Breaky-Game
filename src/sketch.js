@@ -18,6 +18,7 @@ const colors = {
     bricks: "#999",
     pillars: "#0D1117",
     projectile: "#F76707",
+    prisoners: "#EED0B6",
   },
   text: {
     score: "#FFF",
@@ -89,17 +90,18 @@ class Ball {
   }
 
   bouncePillar() {
+    // FIXME: Weird bug happening when the ball bounces off the corner of a pillar, it sort of goes into the border of the pillar, does the up and down and then rewinds it's trajectory
+
     const normalPillars = this.pillars.filter((x) => x.type === "normal");
     const protectionPillars = this.pillars.filter(
       (x) => x.type === "protection"
     );
 
     for (let pillar of protectionPillars) {
+      // prettier-ignore
       if (
-        this.pos.x + this.rad >
-          pillar.pos.x - pillar.protectionPillarWidth / 2 &&
-        this.pos.x - this.rad <
-          pillar.pos.x + pillar.protectionPillarWidth / 2 &&
+        this.pos.x + this.rad > pillar.pos.x - pillar.protectionPillarWidth / 2 &&
+        this.pos.x - this.rad < pillar.pos.x + pillar.protectionPillarWidth / 2 &&
         this.pos.y - this.rad < pillar.pos.y + pillar.protectionPillarHeight / 2
       )
         this.rev("y");
@@ -383,7 +385,6 @@ class Projectile {
     this.height = 15;
 
     this.pos = createVector(brick.pos.x, brick.pos.y + this.height / 2);
-    // this.pos = createVector(brick.pos.x, brick.pos.y);
     this.velocity = createVector(0, 1); // Increase speed once testing is done;
     this.newPos = createVector(
       gameWindow.getMiddleX(),
@@ -441,6 +442,49 @@ class Brick {
   }
 }
 
+class Prisoner {
+  constructor() {
+    this.height = 20;
+    this.width = 15;
+
+    this.xOffSet =
+      Math.random() > 0.5
+        ? pillars.width
+        : gameWindow.getMiddleX() + pillars.width / 2; // Side where the prisoners spawn
+    this.widthBetweenPillars = 585;
+  }
+
+  setPos() {
+    let randomX = Math.trunc(
+      this.xOffSet + Math.random() * this.widthBetweenPillars
+    );
+    // FIXME: Code seems to create an infinite loop, might not really need it tbh since they're moving eggs lmao. the point of it was just to make sure the eggs don't collide with each others.
+
+    // while(prisoners.some(x => x.pos.x > x.pos.x - x.width / 2 && x.pos.x < x.pos.x + x.width / 2))
+    //   randomX = Math.trunc(this.xOffSet + Math.random() * this.widthBetweenPillars);
+
+    this.pos = createVector(randomX, 30);
+  }
+
+  display() {
+    fill(colors.gameObjects.prisoners);
+    ellipse(this.pos.x, this.pos.y, this.width, this.height);
+  }
+
+  idle() {
+    if (
+      frameCount % 15 === 0 &&
+      this.pos.x - this.width / 2 > this.xOffSet &&
+      this.pos.x + this.width / 2 < this.xOffSet + this.widthBetweenPillars
+    )
+      this.pos.add(createVector(randomlyMakeNegative(Math.random() * 5), 0));
+  }
+
+  free() {
+    // Method is only activated when the gamestate is = win, probably will only make the eggs move a bit to the center and then make them move on the Y axis until they're behind the pillars that have been retrieved
+  }
+}
+
 // **************************************************** //
 
 /// Game Objects
@@ -453,6 +497,14 @@ let pillar_5;
 let paddle;
 let ball;
 let cannon;
+
+// **************************************************** //
+
+/// Game Object Arrays
+
+let prisoners = [];
+let projectiles = [];
+let bricks = [];
 
 // **************************************************** //
 
@@ -498,14 +550,11 @@ function setup() {
   ball = new Ball(paddle, pillar_1, pillar_2, pillar_3, pillar_4, pillar_5);
   cannon = new Cannon(paddle, ball);
 
-  const bricksArr = [
-    createBricks(pillars.width),
-    createBricks(gameWindow.getMiddleX() + pillars.width / 2),
-  ];
-  bricksArr.shift(); // For some reason I was getting twice the amount of bricks I needed to get
-  bricks = bricksArr.flat();
+  createBricks(pillars.width);
+  createBricks(gameWindow.getMiddleX() + pillars.width / 2);
 
-  projectiles = createProjectiles();
+  createProjectiles();
+  createPrisoners();
 
   scoreText.X = gameWindow.X - scoreText.textSize * 6;
   scoreText.Y = 50;
@@ -533,6 +582,7 @@ function draw() {
 function allTimeState() {
   paddle.display();
   manageBricks();
+  managePrisoners();
 
   pillar_1.display();
   pillar_2.display();
@@ -596,8 +646,6 @@ function displayScore() {
   text(`Score: ${playerScore}`, scoreText.X, scoreText.Y);
 }
 
-let bricks = [];
-
 /**
  *
  * @param { number } xOffSet OffSet value on the Y axis due to the pillars existing.
@@ -631,20 +679,26 @@ function createBricks(xOffSet) {
   return bricks;
 }
 
-let projectiles = [];
-
 /**
- * Creates the projectiles and calls their appropriate methods. It also deals with bricks getting destroyed on the map.
+ * Creates the projectiles and calls their appropriate methods. It also deals with bricks that can no longer shoot projectiles because they're gone.
  */
 function createProjectiles() {
   const enemyBricks = bricks.filter((x) => x.shoots === true);
-
-  for (let brick of enemyBricks) {
-    let projectile = new Projectile(brick);
-    projectiles.push(projectile);
-  }
+  for (let brick of enemyBricks) projectiles.push(new Projectile(brick));
 
   return projectiles;
+}
+
+/**
+ * Creates the prisoners and sets their position while pushing them to an array for further use.
+ */
+function createPrisoners() {
+  const prisonersCount = 15;
+  for (let i = 0; i < prisonersCount; i++) {
+    let prisoner = new Prisoner();
+    prisoner.setPos();
+    prisoners.push(prisoner);
+  }
 }
 
 /**
@@ -680,6 +734,18 @@ function manageProjectiles() {
 }
 
 /**
+ *  Displays the prisoners and make's them idle a bit. If the game is won the prisoners move outside of the prison.
+ */
+function managePrisoners() {
+  for (let prisoner of prisoners) {
+    prisoner.display();
+    prisoner.idle();
+
+    if (gameState === "win") prisoners.free();
+  }
+}
+
+/**
  * Used to fullscreen the game. P5.js calls this function on it's own, it just needs to be defined to work.
  */
 function mousePressed() {
@@ -705,11 +771,20 @@ function randomColor() {
 
 /**
  * Turns an irrational number into a rational number with 2 decimal points.
- * @param { number } num
+ * @param { number } num irrational number
  * @returns The irrational number made rational
  */
 function rational(num) {
   return Number(num.toFixed(2));
+}
+
+/**
+ * Randomly makes a value negative or not
+ * @param { number } val Value to be made randomly negative
+ * @returns randomly made negative value
+ */
+function randomlyMakeNegative(val) {
+  return Math.random() > 0.5 ? -val : val;
 }
 
 // !! Not so sure if I'm going to refactor the code with this function, keep in mind that the $ sign doesn't look that neat and that descriptive
