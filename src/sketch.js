@@ -90,7 +90,7 @@ class Ball {
   }
 
   bouncePillar() {
-    // FIXME: Weird bug happening when the ball bounces off the corner of a pillar, it sort of goes into the border of the pillar, does the up and down and then rewinds it's trajectory
+    // FIXME: Weird bug happening when the ball bounces off the corner of a pillar, it sort of goes into the border of the pillar, does the up and down and then rewinds it's trajectory, maybe even talk with Raffael
 
     const normalPillars = this.pillars.filter((x) => x.type === "normal");
     const protectionPillars = this.pillars.filter(
@@ -158,12 +158,7 @@ class Ball {
       if (keyIsDown(keyCodesObject.A)) this.pos.add(this.speed.left);
       if (keyIsDown(keyCodesObject.D)) this.pos.add(this.speed.right);
 
-      this.trail = [
-        {
-          x: this.pos.x,
-          y: this.pos.y,
-        },
-      ];
+      this.trail = [];
     }
   }
 
@@ -458,8 +453,7 @@ class Prisoner {
     let randomX = Math.trunc(
       this.xOffSet + Math.random() * this.widthBetweenPillars
     );
-    // FIXME: Code seems to create an infinite loop, might not really need it tbh since they're moving eggs lmao. the point of it was just to make sure the eggs don't collide with each others.
-
+    // !! Code seems to create an infinite loop, might not really need it tbh since they're moving eggs lmao
     // while(prisoners.some(x => x.pos.x > x.pos.x - x.width / 2 && x.pos.x < x.pos.x + x.width / 2))
     //   randomX = Math.trunc(this.xOffSet + Math.random() * this.widthBetweenPillars);
 
