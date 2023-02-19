@@ -51,9 +51,10 @@ const keyCodesObject = {
 
 /// Basic Variables
 
-const bugFixVal = 1; // pixels
+const onePx = 1; // pixels
 
 let shot = false;
+let retreated = false;
 let playerScore = 0;
 let gameState = "playing";
 
@@ -211,7 +212,7 @@ class Paddle {
   constructor() {
     this.width = 175;
     this.height = 30;
-    this.YOffset = 35;
+    this.YOffset = 45;
     this.pos = createVector(
       gameWindow.getMiddleX(),
       gameWindow.Y - this.YOffset
@@ -313,13 +314,21 @@ class Pillar {
     this.pos = pos;
     this.type = type;
     this.direction = direction;
-    this.retreatSpeed = createVector(20, 0);
+    this.retreatSpeed = {
+      left: createVector(-10, 0),
+      right: createVector(10, 0),
+    };
+    this.retreated = false;
 
     this.normalPillarWidth = pillars.width;
     this.normalPillarHeight = pillars.height;
-    this.protectionPillarWidth =
-      gameWindow.getMiddleX() - pillars.width * 1.5 + bugFixVal * 2;
+    // prettier-ignore
+    this.protectionPillarWidth = gameWindow.getMiddleX() - pillars.width * 1.5 + onePx * 2; // onePx * 2 makes the horizontal pillars blend with the vertical ones
     this.protectionPillarHeight = 60;
+
+    this.line1End = gameWindow.getMiddleX() - this.normalPillarWidth / 2;
+    this.line2Start = gameWindow.getMiddleX() + this.normalPillarWidth / 2;
+    this.lineColor = "#000";
   }
 
   display() {
@@ -349,18 +358,18 @@ class Pillar {
     }
 
     push();
-    stroke("#000");
+    stroke(this.lineColor);
     line(
-      this.normalPillarWidth,
+      this.normalPillarWidth + onePx * 2,
       this.protectionPillarHeight,
-      gameWindow.getMiddleX() - this.normalPillarWidth / 2,
+      gameWindow.getMiddleX() - this.normalPillarWidth / 2 - onePx * 2,
       this.protectionPillarHeight
     );
 
     line(
-      gameWindow.getMiddleX() + this.normalPillarWidth / 2,
+      gameWindow.getMiddleX() + this.normalPillarWidth / 2 + onePx * 2,
       this.protectionPillarHeight,
-      gameWindow.X - this.normalPillarWidth,
+      gameWindow.X - this.normalPillarWidth - onePx * 2,
       this.protectionPillarHeight
     );
     pop();
@@ -368,9 +377,22 @@ class Pillar {
 
   retreat() {
     if (this.type === "protection") {
-      if (this.direction === "left") this.pos.add(-this.retreatSpeed);
-      if (this.direction === "right") this.pos.add(this.retreatSpeed);
+      this.lineColor = colors.background; // Removes the lines
+
+      if (this.direction === "left") this.pos.add(this.retreatSpeed.left);
+      if (this.direction === "right") this.pos.add(this.retreatSpeed.right);
     }
+    if (
+      this.direction === "left" &&
+      this.pos.x + this.protectionPillarWidth / 2 < pillars.width
+    )
+      retreated = true;
+
+    if (
+      this.direction === "right" &&
+      this.pos.x - this.protectionPillarWidth / 2 < gameWindow.X - pillars.width
+    )
+      retreated = true;
   }
 }
 
@@ -378,11 +400,16 @@ class Projectile {
   constructor(brick) {
     this.width = 10;
     this.height = 15;
+    this.launched = false;
 
     this.pos = createVector(brick.pos.x, brick.pos.y + this.height / 2);
-    this.velocity = createVector(0, 1); // Increase speed once testing is done;
+    this.velocity = createVector(0, 5); // Increase speed once testing is done;
     this.newPos = createVector(
-      gameWindow.getMiddleX(),
+      choose(
+        pillars.width / 2,
+        gameWindow.getMiddleX(),
+        gameWindow.X - pillars.width / 2
+      ),
       pillars.height - this.height / 2
     );
   }
@@ -395,9 +422,20 @@ class Projectile {
     pop();
   }
 
+  resetPos(brick) {
+    if (this.pos.y > gameWindow.Y) {
+      this.launched = false;
+      if (luck(80)) this.pos = this.newPos;
+      else {
+        // prettier-ignore
+        this.pos = brick !== undefined ? createVector(brick.pos.x, brick.pos.y + this.height / 2) : this.newPos;
+      }
+    }
+  }
+
   move() {
-    if (this.pos.y > gameWindow.Y) this.pos = this.newPos;
-    else this.pos.add(this.velocity);
+    if (luck(90)) this.launched = true;
+    if (this.launched) this.pos.add(this.velocity);
   }
 
   hitsPaddle(paddle) {
@@ -417,7 +455,7 @@ class Brick {
     this.width = width;
     this.height = height;
     this.points = 1;
-    this.shoots = Math.random() > 0.5; // Does the brick shoot a projectile towards the player?
+    this.shoots = luck(50); // Does the brick shoot a projectile towards the player?
     this.isDestroyed = false;
   }
 
@@ -442,21 +480,15 @@ class Prisoner {
     this.height = 20;
     this.width = 15;
 
-    this.xOffSet =
-      Math.random() > 0.5
-        ? pillars.width
-        : gameWindow.getMiddleX() + pillars.width / 2; // Side where the prisoners spawn
-    this.widthBetweenPillars = 585;
+    // prettier-ignore
+    this.xOffSet = luck(50) ? pillars.width : gameWindow.getMiddleX() + pillars.width / 2; // Side where the prisoners spawn
+    this.widthBetweenPillars = 580; // Real value is 585, removing 5 pixels to fix a bug
   }
 
   setPos() {
     let randomX = Math.trunc(
       this.xOffSet + Math.random() * this.widthBetweenPillars
     );
-    // !! Code seems to create an infinite loop, might not really need it tbh since they're moving eggs lmao
-    // while(prisoners.some(x => x.pos.x > x.pos.x - x.width / 2 && x.pos.x < x.pos.x + x.width / 2))
-    //   randomX = Math.trunc(this.xOffSet + Math.random() * this.widthBetweenPillars);
-
     this.pos = createVector(randomX, 30);
   }
 
@@ -475,6 +507,8 @@ class Prisoner {
   }
 
   free() {
+    if (retreated && this.pos.y < gameWindow.Y / 2)
+      this.pos.add(createVector(0, 2));
     // Method is only activated when the gamestate is = win, probably will only make the eggs move a bit to the center and then make them move on the Y axis until they're behind the pillars that have been retrieved
   }
 }
@@ -605,14 +639,14 @@ function playingState() {
 
   paddle.move();
 
-  manageProjectiles();
+  // manageProjectiles(); // TODO: Comment for testing
 
   if (gameState === "lose") endGame();
   if (bricks.length === 0) {
     pillar_4.retreat();
     pillar_5.retreat();
 
-    gameState = "win"; // this needs to be delayed until the protection pillars have retreated and the prisoners are out
+    setTimeout(() => (gameState = "win"), 10000); // this needs to be delayed until the protection pillars have retreated and the prisoners are out
   }
 }
 
@@ -646,8 +680,8 @@ function displayScore() {
  * @returns an Array containing all the bricks. This fucntion is essential for the game to work properly
  */
 function createBricks(xOffSet) {
-  const rows = 5;
-  const bricksPerRow = 5;
+  const rows = 1; // TODO: return to 5
+  const bricksPerRow = 1;
   const brickSize = {
     width: (gameWindow.getMiddleX() - pillars.width * 1.5) / bricksPerRow,
     height: 30,
@@ -716,6 +750,8 @@ function manageBricks() {
 }
 
 function manageProjectiles() {
+  const enemyBricks = bricks.filter((x) => x.shoots === true);
+
   for (let i = projectiles.length - 1; i >= 0; i--) {
     const projectile = projectiles[i];
 
@@ -723,6 +759,7 @@ function manageProjectiles() {
     else {
       projectile.display();
       projectile.move();
+      projectile.resetPos(enemyBricks[i]);
     }
   }
 }
@@ -735,7 +772,7 @@ function managePrisoners() {
     prisoner.display();
     prisoner.idle();
 
-    if (gameState === "win") prisoners.free();
+    prisoner.free();
   }
 }
 
@@ -778,15 +815,23 @@ function rational(num) {
  * @returns randomly made negative value
  */
 function randomlyMakeNegative(val) {
-  return Math.random() > 0.5 ? -val : val;
+  return luck(50) ? -val : val;
 }
 
-// !! Not so sure if I'm going to refactor the code with this function, keep in mind that the $ sign doesn't look that neat and that descriptive
 /**
- * A simple function that divides a number by 2
- * @param { number } val Value we'd like to divide
- * @returns val / 2
+ * Chooses a random value between one of the provided values
+ * @param { Array } vals an array of chosen values
+ * @returns One of the entered values
  */
-function $(val) {
-  return val / 2;
+function choose(...vals) {
+  return vals[Math.trunc(Math.random() * vals.length)];
+}
+
+/**
+ * The point of this function is to make something more unlikely to happen. The bigger `val` is, the smaller the chance of happening.
+ * @param { number } val It's a value between 0 and 100
+ * @returns true or false
+ */
+function luck(val) {
+  return Math.random() >= val / 100;
 }
