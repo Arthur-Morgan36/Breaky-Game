@@ -1,11 +1,11 @@
 /// Fundamental Objects
 
 const gameWindow = {
-  getMiddleX() {
-    return gameWindow.X / 2;
+  getMiddleX(depth = 1) {
+    return gameWindow.X / (2 * depth);
   },
-  getMiddleY() {
-    return gameWindow.Y / 2;
+  getMiddleY(depth = 1) {
+    return gameWindow.Y / (2 * depth);
   },
 };
 
@@ -664,31 +664,60 @@ function endGame() {
  * Pauses and resumes the game to display a settings menu
  */
 function pauseMenu() {
+  // FIXME: Make it so the buttons are only available when the game is paused
+  // TODO: Just use plain old rectangles rather than buttons, easier to style too
+
   background(0);
   gameState = "paused";
 
-  let resumeBtn = createButton("Resume");
-  resumeBtn.size(300, 200);
-  resumeBtn.position(pillars.width * 2, gameWindow.getMiddleY()); // X & Y for the upper left corner
-  // resumeBtn.style() // TODO: set the style of the button
+  const resumeBtn = {
+    x: gameWindow.getMiddleX(2),
+    y: gameWindow.getMiddleY(),
+    width: 300,
+    height: 200,
+  };
 
-  let tutorialBtn = createButton("How to Play");
-  tutorialBtn.size(300, 200);
-  tutorialBtn.position(
-    gameWindow.X - pillars.width * 2,
-    gameWindow.getMiddleY()
-  );
-  // tutorialBtn.style() // TODO: set the style of the button
+  const tutorialBtn = {
+    x: gameWindow.X - gameWindow.getMiddleX(2),
+    y: gameWindow.getMiddleY(),
+    width: 300,
+    height: 200,
+  };
 
-  resumeBtn.mousePressed(() => (gameState = "playing"));
-  tutorialBtn.mousePressed(showControls());
+  rect(...vals(resumeBtn));
+  text("Resume", resumeBtn.x, resumeBtn.y);
 
-  if (keyIsDown(keyCodesObject.R)) gameState = "playing";
+  rect(...vals(tutorialBtn));
+  text("How To Play", tutorialBtn.x, tutorialBtn.y);
+
+  // If checks are true if the player is clicking the button
+  // TODO: Move these functions to the mouseClicked function and make the buttons global objects so the engine doesn't throw undefined when the if checks are in another function
+  if (
+    mouseX > resumeBtn.x - resumeBtn.width &&
+    mouseX < resumeBtn.x + resumeBtn.width &&
+    mouseY > resumeBtn.y - resumeBtn.height &&
+    mouseY < resumeBtn.y + resumeBtn.height
+  )
+    gameState = "playing";
+
+  if (
+    mouseX > tutorialBtn.x - tutorialBtn.width &&
+    mouseX < tutorialBtn.x + tutorialBtn.width &&
+    mouseY > tutorialBtn.y - tutorialBtn.height &&
+    mouseY < tutorialBtn.y + tutorialBtn.height
+  )
+    showKeys();
+
+  if (keyIsDown(keyCodesObject.R)) {
+    gameState = "playing";
+  }
 }
 
-function showControls() {
+function showKeys() {
+  background(color("green"));
   fill(colors.text.score);
-  text(`Hello and Welcome to the control panel of the Breaky Game!\n
+  text(
+    `Hello and Welcome to the control panel of the Breaky Game!\n
 
     I'm SmashMaster Assistant, I'm going to instruct you how to play the game and hopefully win!\n\n
 
@@ -705,7 +734,10 @@ function showControls() {
 
     \n\n
     The Code can be found at https://github.com/Arthur-Morgan36/Breaky-Game
-  `);
+  `,
+    500,
+    250
+  );
 }
 
 /**
@@ -724,7 +756,7 @@ function displayScore() {
  */
 function createBricks(xOffSet) {
   const rows = 1; // TODO: return to 5
-  const bricksPerRow = 1;
+  const bricksPerRow = 1; // TODO: return to 5
   const brickSize = {
     width: (gameWindow.getMiddleX() - pillars.width * 1.5) / bricksPerRow,
     height: 30,
@@ -869,6 +901,10 @@ function randomlyMakeNegative(val) {
  */
 function choose(...vals) {
   return vals[Math.trunc(Math.random() * vals.length)];
+}
+
+function vals(obj) {
+  return Object.values(obj);
 }
 
 /**
