@@ -44,6 +44,8 @@ const scoreText = {
 const keyCodesObject = {
   A: 65,
   D: 68,
+  P: 80,
+  R: 82,
   SPACE: 32,
 };
 
@@ -55,6 +57,8 @@ const onePx = 1; // pixels
 
 let shot = false;
 let retreated = false;
+let prisonersOut = false;
+
 let playerScore = 0;
 let gameState = "playing";
 
@@ -285,8 +289,8 @@ class Cannon {
     if (this.angle <= maxLeftAngle) this.angle = maxLeftAngle;
     if (this.angle >= minLeftAngle) this.angle = minLeftAngle;
 
-    if (keyIsDown(LEFT_ARROW)) this.angle -= 0.15;
-    if (keyIsDown(RIGHT_ARROW)) this.angle += 0.15;
+    if (keyIsDown(LEFT_ARROW)) this.angle -= 0.1;
+    if (keyIsDown(RIGHT_ARROW)) this.angle += 0.1;
   }
 
   display() {
@@ -318,7 +322,6 @@ class Pillar {
       left: createVector(-10, 0),
       right: createVector(10, 0),
     };
-    this.retreated = false;
 
     this.normalPillarWidth = pillars.width;
     this.normalPillarHeight = pillars.height;
@@ -326,8 +329,6 @@ class Pillar {
     this.protectionPillarWidth = gameWindow.getMiddleX() - pillars.width * 1.5 + onePx * 2; // onePx * 2 makes the horizontal pillars blend with the vertical ones
     this.protectionPillarHeight = 60;
 
-    this.line1End = gameWindow.getMiddleX() - this.normalPillarWidth / 2;
-    this.line2Start = gameWindow.getMiddleX() + this.normalPillarWidth / 2;
     this.lineColor = "#000";
   }
 
@@ -381,18 +382,9 @@ class Pillar {
 
       if (this.direction === "left") this.pos.add(this.retreatSpeed.left);
       if (this.direction === "right") this.pos.add(this.retreatSpeed.right);
-    }
-    if (
-      this.direction === "left" &&
-      this.pos.x + this.protectionPillarWidth / 2 < pillars.width
-    )
-      retreated = true;
 
-    if (
-      this.direction === "right" &&
-      this.pos.x - this.protectionPillarWidth / 2 < gameWindow.X - pillars.width
-    )
-      retreated = true;
+      setTimeout(() => (retreated = true), 1000); // it takes about 1 second for the pillars to retreat so the prisoners can get out
+    }
   }
 }
 
@@ -403,7 +395,7 @@ class Projectile {
     this.launched = false;
 
     this.pos = createVector(brick.pos.x, brick.pos.y + this.height / 2);
-    this.velocity = createVector(0, 5); // Increase speed once testing is done;
+    this.velocity = createVector(0, 2.5);
     this.newPos = createVector(
       choose(
         pillars.width / 2,
@@ -507,9 +499,9 @@ class Prisoner {
   }
 
   free() {
-    if (retreated && this.pos.y < gameWindow.Y / 2)
+    if (retreated && this.pos.y <= gameWindow.getMiddleY())
       this.pos.add(createVector(0, 2));
-    // Method is only activated when the gamestate is = win, probably will only make the eggs move a bit to the center and then make them move on the Y axis until they're behind the pillars that have been retrieved
+    if (this.pos.y >= gameWindow.Y / 2) prisonersOut = true;
   }
 }
 
@@ -543,8 +535,8 @@ function setup() {
   gameWindow.Y = displayHeight;
 
   movementSpeed = {
-    right: createVector(gameWindow.X / 120, 0),
-    left: createVector(-gameWindow.X / 120, 0),
+    right: createVector(gameWindow.X / 150, 0),
+    left: createVector(-gameWindow.X / 150, 0),
   };
 
   pillar_1 = new Pillar(
@@ -595,10 +587,13 @@ function setup() {
 
 function draw() {
   background(colors.background);
-  allTimeState();
+  if (keyIsDown(keyCodesObject.P) || gameState === "paused") pauseMenu();
+  if (gameState !== "paused") {
+    allTimeState();
 
-  if (gameState === "playing") playingState();
-  else endGame();
+    if (gameState === "playing") playingState();
+    else endGame();
+  }
 }
 
 // **************************************************** //
@@ -646,7 +641,7 @@ function playingState() {
     pillar_4.retreat();
     pillar_5.retreat();
 
-    setTimeout(() => (gameState = "win"), 10000); // this needs to be delayed until the protection pillars have retreated and the prisoners are out
+    if (prisonersOut) gameState = "win";
   }
 }
 
@@ -663,6 +658,54 @@ function endGame() {
     gameStateText.X,
     gameStateText.Y
   );
+}
+
+/**
+ * Pauses and resumes the game to display a settings menu
+ */
+function pauseMenu() {
+  background(0);
+  gameState = "paused";
+
+  let resumeBtn = createButton("Resume");
+  resumeBtn.size(300, 200);
+  resumeBtn.position(pillars.width * 2, gameWindow.getMiddleY()); // X & Y for the upper left corner
+  // resumeBtn.style() // TODO: set the style of the button
+
+  let tutorialBtn = createButton("How to Play");
+  tutorialBtn.size(300, 200);
+  tutorialBtn.position(
+    gameWindow.X - pillars.width * 2,
+    gameWindow.getMiddleY()
+  );
+  // tutorialBtn.style() // TODO: set the style of the button
+
+  resumeBtn.mousePressed(() => (gameState = "playing"));
+  tutorialBtn.mousePressed(showControls());
+
+  if (keyIsDown(keyCodesObject.R)) gameState = "playing";
+}
+
+function showControls() {
+  fill(colors.text.score);
+  text(`Hello and Welcome to the control panel of the Breaky Game!\n
+
+    I'm SmashMaster Assistant, I'm going to instruct you how to play the game and hopefully win!\n\n
+
+    The goal of the game is to destroy all of the bricks and free the prisoners. You're armed with a cannon that shoots an unlimited amount of cannonballs one at a time. The issue is, you're also getting attacked by other projectiles! You can escape them by moving the paddle on which you stand on, the more bricks you destroy the easier the game becomes.
+    \n\n
+    Basic Key Presses:
+      - Use the A/D keys to move the paddle left/right.
+      - Use the arrow keys to rotate the cannon in the desired direction.
+      - Use the P key to pause the menu. Use the R key to go back to playing the game.
+    \n\n
+    Advanced Key Presses:
+      - Click on the W key while clicking on the A/D key to implement a dash in the desired direction\n
+      - Use the T key to  duplicate the ball while in the air. Watch out, a bad throw might be more detrimental than you think.\n
+
+    \n\n
+    The Code can be found at https://github.com/Arthur-Morgan36/Breaky-Game
+  `);
 }
 
 /**
@@ -792,6 +835,7 @@ function mousePressed() {
 }
 
 /// Helper functions
+
 /**
  * Used to generate a random color between black and white, in hexadecimal forma
  * @returns random hexadecimal code (#000000)
