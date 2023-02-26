@@ -46,6 +46,7 @@ const keyCodesObject = {
   D: 68,
   P: 80,
   R: 82,
+  W: 87,
   SPACE: 32,
 };
 
@@ -67,8 +68,8 @@ let gameState = "playing";
 /// Fundamental Classes
 class Ball {
   constructor(paddle, ...pillars) {
-    this.D = 40;
     this.rad = 20;
+    this.D = this.rad * 2;
     this.pos = createVector(
       paddle.pos.x,
       paddle.pos.y - paddle.height / 2 - this.rad
@@ -83,6 +84,11 @@ class Ball {
     this.pillars = pillars;
 
     this.trail = [];
+    this.yHitCount = 0;
+
+    this.updates = 0;
+    this.growthRate = 1.5;
+    this.grownTimes = 0;
   }
 
   // prettier-ignore
@@ -90,13 +96,12 @@ class Ball {
     if (
       this.pos.x - this.rad < this.paddle.pos.x + this.paddle.width / 2 &&
       this.pos.x + this.rad > this.paddle.pos.x - this.paddle.width / 2 &&
-      this.pos.y + this.rad > this.paddle.pos.y - this.paddle.height / 2
+      this.pos.y + this.rad > this.paddle.pos.y - this.paddle.height / 2 &&
+      shot
     ) gameState = "lose";
   }
 
   bouncePillar() {
-    // FIXME: Weird bug happening when the ball bounces off the corner of a pillar, it sort of goes into the border of the pillar, does the up and down and then rewinds it's trajectory, maybe even talk with Raffael
-
     const normalPillars = this.pillars.filter((x) => x.type === "normal");
     const protectionPillars = this.pillars.filter(
       (x) => x.type === "protection"
@@ -105,28 +110,36 @@ class Ball {
     for (let pillar of protectionPillars) {
       // prettier-ignore
       if (
-        this.pos.x + this.rad > pillar.pos.x - pillar.protectionPillarWidth / 2 &&
-        this.pos.x - this.rad < pillar.pos.x + pillar.protectionPillarWidth / 2 &&
-        this.pos.y - this.rad < pillar.pos.y + pillar.protectionPillarHeight / 2
+        this.pos.x + this.rad > pillar.pos.x - pillar.width / 2 &&
+        this.pos.x - this.rad < pillar.pos.x + pillar.width / 2 &&
+        this.pos.y - this.rad < pillar.pos.y + pillar.height / 2
       )
         this.rev("y");
     }
 
     for (let pillar of normalPillars) {
       if (
-        this.pos.x + this.rad > pillar.pos.x - pillar.normalPillarWidth / 2 &&
-        this.pos.x - this.rad < pillar.pos.x + pillar.normalPillarWidth / 2 &&
-        this.pos.y + this.rad < pillar.normalPillarHeight
+        this.pos.x + this.rad > pillar.pos.x - pillar.width / 2 &&
+        this.pos.x - this.rad < pillar.pos.x + pillar.width / 2 &&
+        this.pos.y + this.rad < pillar.height
       )
         this.rev("x");
 
       if (
-        this.pos.x + this.rad > pillar.pos.x - pillar.normalPillarWidth / 2 &&
-        this.pos.x - this.rad < pillar.pos.x + pillar.normalPillarWidth / 2 &&
-        this.pos.y - this.rad < pillar.normalPillarHeight &&
-        this.pos.y > pillar.normalPillarHeight
-      )
+        this.pos.x + this.rad >= pillar.pos.x - pillar.width / 2 &&
+        this.pos.x - this.rad <= pillar.pos.x + pillar.width / 2 &&
+        this.pos.y - this.rad <= pillar.height &&
+        this.pos.y + this.rad >= pillar.height
+      ) {
         this.rev("y");
+        this.yHitCount++;
+      }
+
+      // This check is here to not allow the ball from bouncing in the pillar when it hits the corner of the pillar. Not my smoothest work but it sure does the job
+      if (this.yHitCount >= 2) {
+        this.rev("y");
+        this.yHitCount = 1;
+      }
     }
   }
 
@@ -163,6 +176,13 @@ class Ball {
       if (keyIsDown(keyCodesObject.A)) this.pos.add(this.speed.left);
       if (keyIsDown(keyCodesObject.D)) this.pos.add(this.speed.right);
 
+      // Make the ball move at the same time with the paddle when dashing
+      if (keyIsDown(keyCodesObject.A) && keyIsDown(keyCodesObject.W))
+        this.pos.add(this.speed.left);
+
+      if (keyIsDown(keyCodesObject.D) && keyIsDown(keyCodesObject.W))
+        this.pos.add(this.speed.right);
+
       this.trail = [];
     }
   }
@@ -177,6 +197,21 @@ class Ball {
         pop();
       }
     }
+  }
+
+  grow() {
+    if (bricks.length % 5 !== 0) this.updates = 1;
+
+    if (bricks.length % 5 === 0 && this.updates === 1) {
+      this.rad += this.growthRate;
+      this.D += this.growthRate * 2;
+      this.updates = 0;
+      this.grownTimes++;
+    }
+  }
+
+  duplicate() {
+    // Once the T key is hit, the ball is duplicated but the X changes, it just continues in the other direction, not sure if I'm going to have to create another ball for this midair and then remove that ball though, I'll have to figure it out next time I code
   }
 
   applyForce(force) {
@@ -208,6 +243,7 @@ class Ball {
       shot = false;
       this.resetSpeed();
       this.resetPos();
+      this.yHitCount = 0;
     }
   }
 }
@@ -237,6 +273,13 @@ class Paddle {
 
     if (keyIsDown(keyCodesObject.A)) this.pos.add(this.speed.left);
     if (keyIsDown(keyCodesObject.D)) this.pos.add(this.speed.right);
+
+    // Dashing ability to move faster
+    if (keyIsDown(keyCodesObject.A) && keyIsDown(keyCodesObject.W))
+      this.pos.add(this.speed.left);
+
+    if (keyIsDown(keyCodesObject.D) && keyIsDown(keyCodesObject.W))
+      this.pos.add(this.speed.right);
   }
 }
 
@@ -295,7 +338,9 @@ class Cannon {
 
   display() {
     fill(colors.gameObjects.cannon);
-    let translationXVal = this.paddle.pos.x;
+    this.width = this.ball.D;
+    let translationXVal =
+      this.paddle.pos.x - this.ball.growthRate * this.ball.grownTimes;
     let translationYVal =
       this.paddle.pos.y - this.paddle.height / 2 - this.ball.rad;
 
@@ -323,11 +368,11 @@ class Pillar {
       right: createVector(10, 0),
     };
 
-    this.normalPillarWidth = pillars.width;
-    this.normalPillarHeight = pillars.height;
-    // prettier-ignore
-    this.protectionPillarWidth = gameWindow.getMiddleX() - pillars.width * 1.5 + onePx * 2; // onePx * 2 makes the horizontal pillars blend with the vertical ones
-    this.protectionPillarHeight = 60;
+    this.width =
+      this.type === "normal"
+        ? pillars.width
+        : gameWindow.getMiddleX() - pillars.width * 1.5 + onePx * 2; // onePx * 2 makes the horizontal pillars blend with the vertical ones
+    this.height = this.type === "normal" ? pillars.height : 60;
 
     this.lineColor = "#000";
   }
@@ -335,45 +380,31 @@ class Pillar {
   display() {
     fill(colors.gameObjects.pillars);
     if (this.type === "normal")
-      rect(
-        this.pos.x,
-        this.pos.y,
-        this.normalPillarWidth,
-        this.normalPillarHeight,
-        0,
-        0,
-        5,
-        5
-      );
+      rect(this.pos.x, this.pos.y, this.width, this.height, 0, 0, 5, 5);
 
     if (this.type === "protection") {
       push();
       noStroke();
-      rect(
-        this.pos.x,
-        this.pos.y,
-        this.protectionPillarWidth,
-        this.protectionPillarHeight
+      rect(this.pos.x, this.pos.y, this.width, this.height);
+      pop();
+
+      push();
+      stroke(this.lineColor);
+      line(
+        pillars.width + onePx * 2,
+        this.height,
+        gameWindow.getMiddleX() - pillars.width / 2 - onePx * 2,
+        this.height
+      );
+
+      line(
+        gameWindow.getMiddleX() + pillars.width / 2 + onePx * 2,
+        this.height,
+        gameWindow.X - pillars.width - onePx * 2,
+        this.height
       );
       pop();
     }
-
-    push();
-    stroke(this.lineColor);
-    line(
-      this.normalPillarWidth + onePx * 2,
-      this.protectionPillarHeight,
-      gameWindow.getMiddleX() - this.normalPillarWidth / 2 - onePx * 2,
-      this.protectionPillarHeight
-    );
-
-    line(
-      gameWindow.getMiddleX() + this.normalPillarWidth / 2 + onePx * 2,
-      this.protectionPillarHeight,
-      gameWindow.X - this.normalPillarWidth - onePx * 2,
-      this.protectionPillarHeight
-    );
-    pop();
   }
 
   retreat() {
@@ -518,13 +549,15 @@ let paddle;
 let ball;
 let cannon;
 
-// **************************************************** //
-
 /// Game Object Arrays
 
 let prisoners = [];
 let projectiles = [];
 let bricks = [];
+
+/// Game Buttons
+let resumeBtn;
+let tutorialBtn;
 
 // **************************************************** //
 
@@ -581,6 +614,20 @@ function setup() {
   gameStateText.X = gameWindow.getMiddleX() - gameStateText.textSize * 2;
   gameStateText.Y = gameWindow.getMiddleY();
 
+  resumeBtn = {
+    x: gameWindow.getMiddleX(2),
+    y: gameWindow.getMiddleY(),
+    width: 300,
+    height: 200,
+  };
+
+  tutorialBtn = {
+    x: gameWindow.X - gameWindow.getMiddleX(2),
+    y: gameWindow.getMiddleY(),
+    width: 300,
+    height: 200,
+  };
+
   createCanvas(gameWindow.X, gameWindow.Y);
   rectMode(CENTER);
 }
@@ -627,6 +674,7 @@ function playingState() {
   ball.display();
   ball.updatePos();
   ball.traceTrajectory();
+  ball.grow();
 
   cannon.display();
   cannon.shoot();
@@ -664,49 +712,22 @@ function endGame() {
  * Pauses and resumes the game to display a settings menu
  */
 function pauseMenu() {
-  // FIXME: Make it so the buttons are only available when the game is paused
-  // TODO: Just use plain old rectangles rather than buttons, easier to style too
-
   background(0);
   gameState = "paused";
 
-  const resumeBtn = {
-    x: gameWindow.getMiddleX(2),
-    y: gameWindow.getMiddleY(),
-    width: 300,
-    height: 200,
-  };
+  push();
+  textAlign(CENTER);
 
-  const tutorialBtn = {
-    x: gameWindow.X - gameWindow.getMiddleX(2),
-    y: gameWindow.getMiddleY(),
-    width: 300,
-    height: 200,
-  };
+  fill("white");
+  stroke("black");
+  strokeWeight(3);
 
   rect(...vals(resumeBtn));
   text("Resume", resumeBtn.x, resumeBtn.y);
 
   rect(...vals(tutorialBtn));
   text("How To Play", tutorialBtn.x, tutorialBtn.y);
-
-  // If checks are true if the player is clicking the button
-  // TODO: Move these functions to the mouseClicked function and make the buttons global objects so the engine doesn't throw undefined when the if checks are in another function
-  if (
-    mouseX > resumeBtn.x - resumeBtn.width &&
-    mouseX < resumeBtn.x + resumeBtn.width &&
-    mouseY > resumeBtn.y - resumeBtn.height &&
-    mouseY < resumeBtn.y + resumeBtn.height
-  )
-    gameState = "playing";
-
-  if (
-    mouseX > tutorialBtn.x - tutorialBtn.width &&
-    mouseX < tutorialBtn.x + tutorialBtn.width &&
-    mouseY > tutorialBtn.y - tutorialBtn.height &&
-    mouseY < tutorialBtn.y + tutorialBtn.height
-  )
-    showKeys();
+  pop();
 
   if (keyIsDown(keyCodesObject.R)) {
     gameState = "playing";
@@ -714,7 +735,7 @@ function pauseMenu() {
 }
 
 function showKeys() {
-  background(color("green"));
+  background(0);
   fill(colors.text.score);
   text(
     `Hello and Welcome to the control panel of the Breaky Game!\n
@@ -730,7 +751,7 @@ function showKeys() {
     \n\n
     Advanced Key Presses:
       - Click on the W key while clicking on the A/D key to implement a dash in the desired direction\n
-      - Use the T key to  duplicate the ball while in the air. Watch out, a bad throw might be more detrimental than you think.\n
+      - Use the T key to duplicate the ball while in the air. Watch out, a bad throw might be more detrimental than you think.\n
 
     \n\n
     The Code can be found at https://github.com/Arthur-Morgan36/Breaky-Game
@@ -755,8 +776,8 @@ function displayScore() {
  * @returns an Array containing all the bricks. This fucntion is essential for the game to work properly
  */
 function createBricks(xOffSet) {
-  const rows = 1; // TODO: return to 5
-  const bricksPerRow = 1; // TODO: return to 5
+  const rows = 5; // TODO: return to 5
+  const bricksPerRow = 5; // TODO: return to 5
   const brickSize = {
     width: (gameWindow.getMiddleX() - pillars.width * 1.5) / bricksPerRow,
     height: 30,
@@ -859,11 +880,28 @@ function mousePressed() {
     mouseX > 0 &&
     mouseX < gameWindow.X &&
     mouseY > 0 &&
-    mouseY < gameWindow.Y
+    mouseY < gameWindow.Y &&
+    gameState !== "paused"
   ) {
     let fs = fullscreen();
     fullscreen(!fs);
   }
+
+  if (
+    mouseX > resumeBtn.x - resumeBtn.width &&
+    mouseX < resumeBtn.x + resumeBtn.width &&
+    mouseY > resumeBtn.y - resumeBtn.height &&
+    mouseY < resumeBtn.y + resumeBtn.height
+  )
+    gameState = "playing";
+
+  if (
+    mouseX > tutorialBtn.x - tutorialBtn.width &&
+    mouseX < tutorialBtn.x + tutorialBtn.width &&
+    mouseY > tutorialBtn.y - tutorialBtn.height &&
+    mouseY < tutorialBtn.y + tutorialBtn.height
+  )
+    showKeys();
 }
 
 /// Helper functions
