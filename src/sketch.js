@@ -46,6 +46,7 @@ const keyCodesObject = {
   D: 68,
   P: 80,
   R: 82,
+  T: 84,
   W: 87,
   SPACE: 32,
 };
@@ -60,6 +61,7 @@ let shot = false;
 let retreated = false;
 let prisonersOut = false;
 
+let TKeyHit = 0;
 let playerScore = 0;
 let gameState = "playing";
 
@@ -76,7 +78,7 @@ class Ball {
     );
     this.velocity = createVector();
     this.acceleration = createVector();
-    this.topSpeed = 15;
+    this.topSpeed = 18;
 
     this.speed = movementSpeed;
 
@@ -89,16 +91,19 @@ class Ball {
     this.updates = 0;
     this.growthRate = 1.5;
     this.grownTimes = 0;
+
+    this.original = true;
+    this.duplicated = false;
   }
 
-  // prettier-ignore
   collidePaddle() {
     if (
       this.pos.x - this.rad < this.paddle.pos.x + this.paddle.width / 2 &&
       this.pos.x + this.rad > this.paddle.pos.x - this.paddle.width / 2 &&
       this.pos.y + this.rad > this.paddle.pos.y - this.paddle.height / 2 &&
       shot
-    ) gameState = "lose";
+    )
+      gameState = "lose";
   }
 
   bouncePillar() {
@@ -138,13 +143,10 @@ class Ball {
       // This check is here to not allow the ball from bouncing in the pillar when it hits the corner of the pillar. Not my smoothest work but it sure does the job
       if (this.yHitCount >= 2) {
         this.rev("y");
+        this.rev("x");
         this.yHitCount = 1;
       }
     }
-  }
-
-  bounceEdge() {
-    if (this.pos.y - this.rad < 0) this.rev("y");
   }
 
   display() {
@@ -210,10 +212,6 @@ class Ball {
     }
   }
 
-  duplicate() {
-    // Once the T key is hit, the ball is duplicated but the X changes, it just continues in the other direction, not sure if I'm going to have to create another ball for this midair and then remove that ball though, I'll have to figure it out next time I code
-  }
-
   applyForce(force) {
     this.acceleration.add(force);
   }
@@ -245,6 +243,117 @@ class Ball {
       this.resetPos();
       this.yHitCount = 0;
     }
+  }
+}
+
+class BallDuplicate {
+  // FIXME: Duplicate doesn't bounce off pillars on it's own
+
+  constructor(ball, paddle, ...pillars) {
+    this.pos = createVector(ball.pos.x + ball.D, ball.pos.y);
+    this.rad = ball.rad;
+    this.D = ball.D;
+
+    this.velocity = createVector();
+
+    this.ball = ball;
+    this.paddle = paddle;
+    this.pillars = pillars;
+
+    this.trail = [];
+    this.yHitCount = 0;
+
+    this.original = false;
+  }
+
+  collidePaddle() {
+    if (
+      this.pos.x - this.rad < this.paddle.pos.x + this.paddle.width / 2 &&
+      this.pos.x + this.rad > this.paddle.pos.x - this.paddle.width / 2 &&
+      this.pos.y + this.rad > this.paddle.pos.y - this.paddle.height / 2 &&
+      shot
+    )
+      gameState = "lose";
+  }
+
+  bouncePillar() {
+    const normalPillars = this.pillars.filter((x) => x.type === "normal");
+    const protectionPillars = this.pillars.filter(
+      (x) => x.type === "protection"
+    );
+
+    for (let pillar of protectionPillars) {
+      if (
+        this.pos.x + this.rad > pillar.pos.x - pillar.width / 2 &&
+        this.pos.x - this.rad < pillar.pos.x + pillar.width / 2 &&
+        this.pos.y - this.rad < pillar.pos.y + pillar.height / 2
+      )
+        this.rev("y");
+    }
+
+    for (let pillar of normalPillars) {
+      if (
+        this.pos.x + this.rad > pillar.pos.x - pillar.width / 2 &&
+        this.pos.x - this.rad < pillar.pos.x + pillar.width / 2 &&
+        this.pos.y + this.rad < pillar.height
+      )
+        this.rev("x");
+
+      if (
+        this.pos.x + this.rad >= pillar.pos.x - pillar.width / 2 &&
+        this.pos.x - this.rad <= pillar.pos.x + pillar.width / 2 &&
+        this.pos.y - this.rad <= pillar.height &&
+        this.pos.y + this.rad >= pillar.height
+      ) {
+        this.rev("y");
+        this.yHitCount++;
+      }
+
+      // This check is here to not allow the ball from bouncing in the pillar when it hits the corner of the pillar. Not my smoothest work but it does the job
+      if (this.yHitCount >= 2) {
+        this.rev("y");
+        this.rev("x");
+        this.yHitCount = 1;
+      }
+    }
+  }
+
+  display() {
+    strokeWeight(2);
+    fill(colors.gameObjects.ball);
+    circle(this.pos.x, this.pos.y, this.D);
+  }
+
+  update() {
+    this.pos = createVector(this.ball.pos.x + ball.D, this.ball.pos.y);
+    this.rad = this.ball.rad;
+    this.D = this.ball.D;
+
+    if (frameCount % 5 === 0)
+      this.trail.push({
+        x: this.pos.x,
+        y: this.pos.y,
+      });
+  }
+
+  traceTrajectory() {
+    if (shot) {
+      for (let i = 1; i < this.trail.length; i++) {
+        push();
+        noStroke();
+        fill("#FFF");
+        circle(this.trail[i].x, this.trail[i].y, this.D * 0.75);
+        pop();
+      }
+    }
+  }
+
+  resetTrail() {
+    this.trail = [];
+  }
+
+  rev(coord) {
+    this.velocity[coord] *= -1;
   }
 }
 
@@ -313,7 +422,7 @@ class Cannon {
       this.spaceBarHit = 0;
 
       const force = p5.Vector.fromAngle(this.angle);
-      force.mult(15);
+      force.mult(this.ball.topSpeed);
       this.ball.applyForce(force);
     }
 
@@ -339,10 +448,11 @@ class Cannon {
   display() {
     fill(colors.gameObjects.cannon);
     this.width = this.ball.D;
-    let translationXVal =
-      this.paddle.pos.x - this.ball.growthRate * this.ball.grownTimes;
-    let translationYVal =
-      this.paddle.pos.y - this.paddle.height / 2 - this.ball.rad;
+
+    // prettier-ignore
+    let translationXVal = this.paddle.pos.x - this.ball.growthRate * this.ball.grownTimes;
+    // prettier-ignore
+    let translationYVal = this.paddle.pos.y - this.paddle.height / 2 - this.ball.rad;
 
     push();
     rectMode(CORNER); // Switching rectModes only for the cannon to allow the cannon to rotate around the cannonball
@@ -547,6 +657,7 @@ let pillar_5;
 
 let paddle;
 let ball;
+let duplicate;
 let cannon;
 
 /// Game Object Arrays
@@ -599,8 +710,11 @@ function setup() {
     "right"
   );
 
+  const allPillars = [pillar_1, pillar_2, pillar_3, pillar_4, pillar_5];
+
   paddle = new Paddle();
-  ball = new Ball(paddle, pillar_1, pillar_2, pillar_3, pillar_4, pillar_5);
+  ball = new Ball(paddle, ...allPillars);
+  duplicate = new BallDuplicate(ball, paddle, ...allPillars);
   cannon = new Cannon(paddle, ball);
 
   createBricks(pillars.width);
@@ -651,7 +765,7 @@ function draw() {
  */
 function allTimeState() {
   paddle.display();
-  manageBricks();
+  manageBricks(ball);
   managePrisoners();
 
   pillar_1.display();
@@ -667,7 +781,6 @@ function allTimeState() {
  * Methods and functions when the game is running and the player hasn't lost yet. Also takes care of the loss and the winning stage.
  */
 function playingState() {
-  ball.bounceEdge();
   ball.bouncePillar();
   ball.collidePaddle();
   ball.outOfBounds();
@@ -682,6 +795,7 @@ function playingState() {
 
   paddle.move();
 
+  manageDuplicate();
   // manageProjectiles(); // TODO: Comment for testing
 
   if (gameState === "lose") endGame();
@@ -776,8 +890,8 @@ function displayScore() {
  * @returns an Array containing all the bricks. This fucntion is essential for the game to work properly
  */
 function createBricks(xOffSet) {
-  const rows = 5; // TODO: return to 5
-  const bricksPerRow = 5; // TODO: return to 5
+  const rows = 5;
+  const bricksPerRow = 5;
   const brickSize = {
     width: (gameWindow.getMiddleX() - pillars.width * 1.5) / bricksPerRow,
     height: 30,
@@ -828,16 +942,18 @@ function createPrisoners() {
 /**
  * Manages the bricks, removes bricks that have been hit by the ball and otherwise displays the remaining bricks. Additionally it's used to reset the gravity of the cannonball to remove the initial velocity at which the ball might be thrown after a hit on a brick.
  */
-function manageBricks() {
+function manageBricks(ball) {
   for (let i = bricks.length - 1; i >= 0; i--) {
     const brick = bricks[i];
 
     if (brick.isBallColliding(ball)) {
-      shot = false;
+      if (ball.original) {
+        shot = false;
 
-      cannon.resetGravity();
-      ball.resetSpeed();
-      ball.resetPos();
+        cannon.resetGravity();
+        ball.resetSpeed();
+        ball.resetPos();
+      } else ball.resetTrail();
 
       bricks.splice(i, 1);
       playerScore += brick.points;
@@ -869,6 +985,41 @@ function managePrisoners() {
     prisoner.idle();
 
     prisoner.free();
+  }
+}
+
+/**
+ * Manages the duplicate of the ball, everything from spawning to dealing with collisions and updating the ball's properties and visuals.
+ */
+function manageDuplicate() {
+  if (!shot) {
+    ball.duplicated = false;
+    duplicate.resetTrail();
+  }
+
+  if (
+    shot &&
+    (keyIsDown(keyCodesObject.T) || ball.duplicated) &&
+    ball.grownTimes < 1
+  ) {
+    if (keyIsDown(keyCodesObject.T) && TKeyHit < 1) {
+      ball.pos = createVector(ball.pos.x - ball.D, ball.pos.y);
+      TKeyHit++;
+      noLoop();
+    }
+
+    if (!shot) TKeyHit = 0;
+
+    loop();
+    duplicate.bouncePillar();
+    duplicate.collidePaddle();
+    duplicate.display();
+    duplicate.update();
+    duplicate.traceTrajectory();
+
+    manageBricks(duplicate);
+
+    ball.duplicated = true;
   }
 }
 
