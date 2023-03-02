@@ -368,11 +368,25 @@ class Paddle {
     );
 
     this.speed = movementSpeed;
+
+    this.updates = 0;
+    this.growthRate = 10;
+    this.grownTimes = 0;
   }
 
   display() {
     fill(colors.gameObjects.paddle);
     rect(this.pos.x, this.pos.y, this.width, this.height, 10);
+  }
+
+  grow() {
+    if (bricks.length % 5 !== 0) this.updates = 1;
+
+    if (bricks.length % 5 === 0 && this.updates === 1) {
+      this.width += this.growthRate;
+      this.updates = 0;
+      this.grownTimes++;
+    }
   }
 
   move() {
@@ -545,6 +559,10 @@ class Projectile {
       ),
       pillars.height - this.height / 2
     );
+
+    this.updates = 0;
+    this.growthRate = 1;
+    this.grownTimes = 0;
   }
 
   display() {
@@ -563,6 +581,16 @@ class Projectile {
         // prettier-ignore
         this.pos = brick !== undefined ? createVector(brick.pos.x, brick.pos.y + this.height / 2) : this.newPos;
       }
+    }
+  }
+
+  accelerate() {
+    if (bricks.length % 5 !== 0) this.updates = 1;
+
+    if (bricks.length % 5 === 0 && this.updates === 1) {
+      this.velocity.add(0, this.growthRate)
+      this.updates = 0;
+      this.grownTimes++;
     }
   }
 
@@ -588,7 +616,7 @@ class Brick {
     this.width = width;
     this.height = height;
     this.points = 1;
-    this.shoots = luck(50); // Does the brick shoot a projectile towards the player?
+    this.shoots = luck(55); // Does the brick shoot a projectile towards the player?
     this.isDestroyed = false;
   }
 
@@ -794,9 +822,10 @@ function playingState() {
   cannon.rotate();
 
   paddle.move();
+  paddle.grow();
 
   manageDuplicate();
-  // manageProjectiles(); // TODO: Comment for testing
+  manageProjectiles();
 
   if (gameState === "lose") endGame();
   if (bricks.length === 0) {
@@ -971,6 +1000,7 @@ function manageProjectiles() {
     else {
       projectile.display();
       projectile.move();
+      projectile.accelerate();
       projectile.resetPos(enemyBricks[i]);
     }
   }
