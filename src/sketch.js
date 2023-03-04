@@ -33,6 +33,17 @@ const pillars = {
   height: 330,
 };
 
+const keyCodesObject = {
+  A: 65,
+  D: 68,
+  H: 72,
+  P: 80,
+  R: 82,
+  T: 84,
+  W: 87,
+  SPACE: 32,
+};
+
 const gameStateText = {
   textSize: 120,
 };
@@ -41,16 +52,7 @@ const scoreText = {
   textSize: 36,
 };
 
-const keyCodesObject = {
-  A: 65,
-  D: 68,
-  P: 80,
-  R: 82,
-  T: 84,
-  W: 87,
-  SPACE: 32,
-};
-
+const topBricksY = 135;
 // **************************************************** //
 
 /// Basic Variables
@@ -96,6 +98,9 @@ class Ball {
     this.duplicated = false;
   }
 
+  /**
+   * Method used to check if the ball is colliding with the paddle
+   */
   collidePaddle() {
     if (
       this.pos.x - this.rad < this.paddle.pos.x + this.paddle.width / 2 &&
@@ -106,6 +111,9 @@ class Ball {
       gameState = "lose";
   }
 
+  /**
+   * Method used to check if the ball is going to bounce off a pillar.
+   */
   bouncePillar() {
     const normalPillars = this.pillars.filter((x) => x.type === "normal");
     const protectionPillars = this.pillars.filter(
@@ -118,8 +126,10 @@ class Ball {
         this.pos.x + this.rad > pillar.pos.x - pillar.width / 2 &&
         this.pos.x - this.rad < pillar.pos.x + pillar.width / 2 &&
         this.pos.y - this.rad < pillar.pos.y + pillar.height / 2
-      )
+      ) {
+        bounceSound.play();
         this.rev("y");
+      }
     }
 
     for (let pillar of normalPillars) {
@@ -127,8 +137,10 @@ class Ball {
         this.pos.x + this.rad > pillar.pos.x - pillar.width / 2 &&
         this.pos.x - this.rad < pillar.pos.x + pillar.width / 2 &&
         this.pos.y + this.rad < pillar.height
-      )
+      ) {
+        bounceSound.play();
         this.rev("x");
+      }
 
       if (
         this.pos.x + this.rad >= pillar.pos.x - pillar.width / 2 &&
@@ -136,6 +148,8 @@ class Ball {
         this.pos.y - this.rad <= pillar.height &&
         this.pos.y + this.rad >= pillar.height
       ) {
+        bounceSound.play();
+
         this.rev("y");
         this.yHitCount++;
       }
@@ -155,6 +169,9 @@ class Ball {
     circle(this.pos.x, this.pos.y, this.D);
   }
 
+  /**
+   * Update the acceleration, velocity and position of the ball. Also traces the trail behind the ball.
+   */
   update() {
     this.velocity.add(this.acceleration);
     this.velocity.limit(this.topSpeed);
@@ -168,6 +185,9 @@ class Ball {
       });
   }
 
+  /**
+   * Update the position of the ball relative to the paddle when it's not shot.
+   */
   updatePos() {
     if (!shot) {
       if (this.pos.x - this.paddle.width / 2 < 0)
@@ -189,6 +209,9 @@ class Ball {
     }
   }
 
+  /**
+   * Traces the trail that the ball leaves behind.
+   */
   traceTrajectory() {
     if (shot) {
       for (let i = 1; i < this.trail.length; i++) {
@@ -201,6 +224,9 @@ class Ball {
     }
   }
 
+  /**
+   * Grows the ball every 5 destroyed bricks, making the game easier.
+   */
   grow() {
     if (bricks.length % 5 !== 0) this.updates = 1;
 
@@ -212,14 +238,25 @@ class Ball {
     }
   }
 
+  /**
+   * Method used later within the cannon class to apply gravity to the ball and the power at the angle of rotation of the cannon
+   * @param { p5 Vector } force the vector wished to be applied to the ball
+   */
   applyForce(force) {
     this.acceleration.add(force);
   }
 
+  /**
+   * Reverses the passed in coordinate. Useful for collisions.
+   * @param { x || y} coord the coordinate wished to be reversed
+   */
   rev(coord) {
     this.velocity[coord] *= -1;
   }
 
+  /**
+   * Reset the position of the ball after shot
+   */
   resetPos() {
     this.pos = createVector(
       paddle.pos.x,
@@ -227,11 +264,17 @@ class Ball {
     );
   }
 
+  /**
+   * Reset the ball speed after shot
+   */
   resetSpeed() {
     this.velocity = createVector();
     this.acceleration = createVector();
   }
 
+  /**
+   * Deals with the ball going out of bounds
+   */
   outOfBounds() {
     if (
       this.pos.x + this.rad > gameWindow.X ||
@@ -379,6 +422,9 @@ class Paddle {
     rect(this.pos.x, this.pos.y, this.width, this.height, 10);
   }
 
+  /**
+   * Grows the paddle to make the game harder since there's less projectiles on the map
+   */
   grow() {
     if (bricks.length % 5 !== 0) this.updates = 1;
 
@@ -389,6 +435,9 @@ class Paddle {
     }
   }
 
+  /**
+   * Moves the paddle left and right. Also takes care of the dashing ability.
+   */
   move() {
     if (this.pos.x - this.width / 2 <= 0) this.pos.x = this.width / 2;
     if (this.pos.x + this.width / 2 >= gameWindow.X)
@@ -425,12 +474,20 @@ class Cannon {
     this.gravity = createVector(0, 0.05);
   }
 
+  /**
+   * Reset the gravity
+   */
   resetGravity() {
     this.gravity = createVector(0, 0);
   }
 
+  /**
+   * Shoot the ball and apply gravity to the ball
+   */
   shoot() {
     if (keyIsDown(keyCodesObject.SPACE) && this.spaceBarHit !== 0) {
+      shootSound.play();
+
       this.gravity = createVector(0, 0.05);
       shot = true;
       this.spaceBarHit = 0;
@@ -448,6 +505,9 @@ class Cannon {
     if (!shot) this.spaceBarHit = 1;
   }
 
+  /**
+   * Method used to rotate the cannon left or right
+   */
   rotate() {
     const maxLeftAngle = rational(-2.320796326794896);
     const minLeftAngle = rational(-0.805454889999999);
@@ -512,25 +572,31 @@ class Pillar {
       rect(this.pos.x, this.pos.y, this.width, this.height);
       pop();
 
-      push();
-      stroke(this.lineColor);
-      line(
-        pillars.width + onePx * 2,
-        this.height,
-        gameWindow.getMiddleX() - pillars.width / 2 - onePx * 2,
-        this.height
-      );
+      // Not using a check with the retreated variable because that's triggered a second after the pillars are retracted already
+      if (bricks.length !== 0) {
+        push();
+        stroke(this.lineColor);
+        line(
+          pillars.width + onePx * 2,
+          this.height,
+          gameWindow.getMiddleX() - pillars.width / 2 - onePx * 2,
+          this.height
+        );
 
-      line(
-        gameWindow.getMiddleX() + pillars.width / 2 + onePx * 2,
-        this.height,
-        gameWindow.X - pillars.width - onePx * 2,
-        this.height
-      );
-      pop();
+        line(
+          gameWindow.getMiddleX() + pillars.width / 2 + onePx * 2,
+          this.height,
+          gameWindow.X - pillars.width - onePx * 2,
+          this.height
+        );
+        pop();
+      }
     }
   }
 
+  /**
+   * Method used to make the pillars retreat and allow the prisoners to go out.
+   */
   retreat() {
     if (this.type === "protection") {
       this.lineColor = colors.background; // Removes the lines
@@ -561,7 +627,7 @@ class Projectile {
     );
 
     this.updates = 0;
-    this.growthRate = 1;
+    this.growthRate = 0.75;
     this.grownTimes = 0;
   }
 
@@ -573,32 +639,62 @@ class Projectile {
     pop();
   }
 
+  /**
+   * Reset the position of the projectile once it's out of bounds. There's a multitude of positions the projectile can take, the default one is a brick's coordinates.
+   * @param { Brick } brick that's used to respawn the projectile
+   */
   resetPos(brick) {
-    if (this.pos.y > gameWindow.Y) {
+    const currentTopBricks = bricks.filter((x) => x.pos.y === topBricksY);
+    const remainingTopBricks = bricksOnTop.filter(
+      (x) => !currentTopBricks.includes(x)
+    );
+
+    if (this.pos.y > gameWindow.Y && bricks.length !== 0) {
       this.launched = false;
-      if (luck(80)) this.pos = this.newPos;
-      else {
+
+      if (luck(75)) this.pos = this.newPos;
+      // prettier-ignore
+      else if (
+        luck(85) &&
+        remainingTopBricks.length !== 0
+      ) {
+        this.pos = createVector(
+          choose(...remainingTopBricks).pos.x,
+          topBricksY
+        );
+      } else {
         // prettier-ignore
         this.pos = brick !== undefined ? createVector(brick.pos.x, brick.pos.y + this.height / 2) : this.newPos;
       }
     }
   }
 
+  /**
+   * Increases the speed of the projectiles as the game closes in
+   */
   accelerate() {
     if (bricks.length % 5 !== 0) this.updates = 1;
 
     if (bricks.length % 5 === 0 && this.updates === 1) {
-      this.velocity.add(0, this.growthRate)
+      this.velocity.add(0, this.growthRate);
       this.updates = 0;
       this.grownTimes++;
     }
   }
 
+  /**
+   * Moves the projectile down
+   */
   move() {
     if (luck(90)) this.launched = true;
     if (this.launched) this.pos.add(this.velocity);
   }
 
+  /**
+   * If the paddle is hit, it's game over
+   * @param { Paddle } paddle
+   * @returns { Boolean } true or false
+   */
   hitsPaddle(paddle) {
     if (
       paddle.pos.x + paddle.width / 2 >= this.pos.x - this.width / 2 &&
@@ -646,6 +742,9 @@ class Prisoner {
     this.widthBetweenPillars = 580; // Real value is 585, removing 5 pixels to fix a bug
   }
 
+  /**
+   * Set the position of the prisoner to a randomX but a fixed Y
+   */
   setPos() {
     let randomX = Math.trunc(
       this.xOffSet + Math.random() * this.widthBetweenPillars
@@ -658,6 +757,9 @@ class Prisoner {
     ellipse(this.pos.x, this.pos.y, this.width, this.height);
   }
 
+  /**
+   * Makes the game a bit more realistic by moving the prisoners around
+   */
   idle() {
     if (
       frameCount % 15 === 0 &&
@@ -667,6 +769,9 @@ class Prisoner {
       this.pos.add(createVector(randomlyMakeNegative(Math.random() * 5), 0));
   }
 
+  /**
+   * Once the pillars are retreated, the prisoners can go out of the castle and they're free
+   */
   free() {
     if (retreated && this.pos.y <= gameWindow.getMiddleY())
       this.pos.add(createVector(0, 2));
@@ -693,10 +798,21 @@ let cannon;
 let prisoners = [];
 let projectiles = [];
 let bricks = [];
+let bricksOnTop = [];
 
 /// Game Buttons
 let resumeBtn;
 let tutorialBtn;
+
+/// Assets
+// .Images
+let backgroundImg;
+
+// .MP3 Files
+let song;
+let shootSound;
+let bounceSound;
+let destroySound;
 
 // **************************************************** //
 
@@ -751,6 +867,8 @@ function setup() {
   createProjectiles();
   createPrisoners();
 
+  bricksOnTop = bricks.filter((x) => x.pos.y === topBricksY);
+
   scoreText.X = gameWindow.X - scoreText.textSize * 6;
   scoreText.Y = 50;
   gameStateText.X = gameWindow.getMiddleX() - gameStateText.textSize * 2;
@@ -770,14 +888,26 @@ function setup() {
     height: 200,
   };
 
+  song.loop();
+
   createCanvas(gameWindow.X, gameWindow.Y);
   rectMode(CENTER);
 }
 
+function preload() {
+  backgroundImg = loadImage("Assets/Background.jpg");
+
+  song = loadSound("Assets/Song.mp3");
+  shootSound = loadSound("Assets/Shoot.wav");
+  bounceSound = loadSound("Assets/Bounce.wav");
+  destroySound = loadSound("Assets/Destroy.wav");
+}
+
 function draw() {
-  background(colors.background);
+  background(backgroundImg);
   if (keyIsDown(keyCodesObject.P) || gameState === "paused") pauseMenu();
-  if (gameState !== "paused") {
+  if (keyIsDown(keyCodesObject.H) || gameState === "tutorial") showKeys();
+  if (gameState !== "paused" && gameState !== "tutorial") {
     allTimeState();
 
     if (gameState === "playing") playingState();
@@ -840,6 +970,8 @@ function playingState() {
  * Ends the game and displays the end game message
  */
 function endGame() {
+  if (gameState === "lose") song.stop();
+
   textSize(gameStateText.textSize);
   fill(gameState === "lose" ? colors.text.lose : randomColor());
   const additionalMessage = gameState === "lose" ? "Game Over" : "Good Job";
@@ -872,36 +1004,46 @@ function pauseMenu() {
   text("How To Play", tutorialBtn.x, tutorialBtn.y);
   pop();
 
-  if (keyIsDown(keyCodesObject.R)) {
-    gameState = "playing";
-  }
+  resume();
 }
 
+/**
+ * Function used to desplay the tutorial menu
+ */
 function showKeys() {
   background(0);
+  gameState = "tutorial";
+
   fill(colors.text.score);
+  textAlign(CENTER);
+  textSize(24);
+
   text(
     `Hello and Welcome to the control panel of the Breaky Game!\n
 
-    I'm SmashMaster Assistant, I'm going to instruct you how to play the game and hopefully win!\n\n
+    I'm SmashMaster Assistant, I'm going to instruct you to teach you how to play the game and hopefully win!\n\n
 
-    The goal of the game is to destroy all of the bricks and free the prisoners. You're armed with a cannon that shoots an unlimited amount of cannonballs one at a time. The issue is, you're also getting attacked by other projectiles! You can escape them by moving the paddle on which you stand on, the more bricks you destroy the easier the game becomes.
+    The goal of the game is to destroy all of the bricks and free the prisoners. You're armed with a cannon that shoots an unlimited amount of cannonballs one at a time. 
+    The issue is, you're also getting attacked by other projectiles!
+    You can escape them by moving the paddle on which you stand on, the more bricks you destroy the easier the game becomes.
     \n\n
     Basic Key Presses:
       - Use the A/D keys to move the paddle left/right.
-      - Use the arrow keys to rotate the cannon in the desired direction.
+      - Use the left and right arrow keys to rotate the cannon in the desired direction.
       - Use the P key to pause the menu. Use the R key to go back to playing the game.
-    \n\n
+    \n
     Advanced Key Presses:
-      - Click on the W key while clicking on the A/D key to implement a dash in the desired direction\n
+      - Use the W key while clicking on the A/D key to implement a dash in the desired direction.\n
       - Use the T key to duplicate the ball while in the air. Watch out, a bad throw might be more detrimental than you think.\n
 
     \n\n
-    The Code can be found at https://github.com/Arthur-Morgan36/Breaky-Game
+    The code can be found at https://github.com/Arthur-Morgan36/Breaky-Game
   `,
-    500,
-    250
+    gameWindow.getMiddleX(),
+    100
   );
+
+  resume();
 }
 
 /**
@@ -984,6 +1126,7 @@ function manageBricks(ball) {
         ball.resetPos();
       } else ball.resetTrail();
 
+      destroySound.play();
       bricks.splice(i, 1);
       playerScore += brick.points;
     } else brick.display();
@@ -1133,4 +1276,11 @@ function vals(obj) {
  */
 function luck(val) {
   return Math.random() >= val / 100;
+}
+
+/**
+ * Resumes the game. Code is called twice so might as well put it into a helper function
+ */
+function resume() {
+  if (keyIsDown(keyCodesObject.R)) gameState = "playing";
 }
