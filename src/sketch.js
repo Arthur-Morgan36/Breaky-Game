@@ -22,20 +22,22 @@ const colors = {
   },
 
   gameObjects: {
-    ball: "#212529",
-    cannon: "#495057",
+    ball: "#343A40",
+    cannon: "#868E96",
     projectile: "#F76707",
     prisoners: "#EED0B6",
     ballTrail: "#FFF",
   },
 
   strokes: {
+    ball: "#DEE2E6",
     lines: "#000",
     bricks: "#22B8CA",
     buttons: "#000",
   },
 
   text: {
+    start: "#212529",
     score: "#F1F3F5",
     lose: "#E03131",
     buttons: "#DEE2E6",
@@ -182,9 +184,11 @@ class Ball {
   }
 
   display() {
-    strokeWeight(2);
+    push();
+    stroke(colors.strokes.ball);
     fill(colors.gameObjects.ball);
     circle(this.pos.x, this.pos.y, this.D);
+    pop();
   }
 
   /**
@@ -963,32 +967,58 @@ function preload() {
  */
 function draw() {
   background(backgroundImg);
+
   if (keyIsDown(keyCodesObject.P) || gameState === "paused") pauseMenu();
   if (keyIsDown(keyCodesObject.H) || gameState === "tutorial") showKeys();
+
+  startGame();
+
   if (gameState !== "paused" && gameState !== "tutorial") {
     allTimeState();
 
-    if (gameState === "playing") playingState();
-    else endGame();
+    if (millis() > 4000) {
+      if (gameState === "playing") playingState();
+      else endGame();
+    }
   }
 }
 
 // **************************************************** //
 
 /// Fundamental Functions
+function startGame() {
+  push();
+  stroke(colors.text.start);
+  textSize(128);
+
+  const textArr = ["3", "2", "1", "Go!", ""];
+  const timeElapsed = millis();
+
+  text(
+    timeElapsed <= 4000 ? textArr[floor(millis() / 1000)] : textArr[4],
+    gameWindow.getMiddleX(),
+    gameWindow.getMiddleY()
+  );
+  pop();
+}
+
 /**
  * Methods and functions that are always rendering no matter the game state
  */
 function allTimeState() {
-  paddle.display();
   manageBricks(ball);
   managePrisoners();
+
+  ball.display();
+  paddle.display();
 
   pillar_1.display();
   pillar_2.display();
   pillar_3.display();
   pillar_4.display();
   pillar_5.display();
+
+  cannon.display();
 
   displayScore();
 }
@@ -1000,12 +1030,10 @@ function playingState() {
   ball.bouncePillar();
   ball.collidePaddle();
   ball.outOfBounds();
-  ball.display();
   ball.updatePos();
   ball.traceTrajectory();
   ball.grow();
 
-  cannon.display();
   cannon.shoot();
   cannon.rotate();
 
@@ -1113,7 +1141,7 @@ Meanwhile, the more bricks you destroy the bigger your ball, cannon, and paddle 
     \n
     Advanced Key Presses:
       - Use the W key while clicking on the A/D key to implement a dash in the desired direction.\n
-      - Use the T key to duplicate the ball while in the air. Watch out, a bad throw might be more detrimental than you think.\n
+      - (ʙᴇᴛᴀ) Use the T key to duplicate the ball while in the air. Watch out, a bad throw might be more detrimental than you think.\n
     \n
     The code can be found at https://github.com/Arthur-Morgan36/Breaky-Game
   `,
