@@ -22,11 +22,8 @@ const colors = {
   },
 
   gameObjects: {
-    ball: "#3B5BDB",
+    ball: "#212529",
     cannon: "#495057",
-    paddle: "#DDDE",
-    bricks: "#868E96",
-    pillars: "#212529",
     projectile: "#F76707",
     prisoners: "#EED0B6",
     ballTrail: "#FFF",
@@ -438,7 +435,15 @@ class Paddle {
   }
 
   display() {
-    fill(colors.gameObjects.paddle);
+    image(
+      paddleImg,
+      this.pos.x - this.width / 2,
+      this.pos.y - this.height / 2,
+      this.width,
+      this.height
+    );
+    // fill(colors.gameObjects.paddle);
+    noFill();
     rect(this.pos.x, this.pos.y, this.width, this.height, 10);
   }
 
@@ -583,7 +588,15 @@ class Pillar {
   }
 
   display() {
-    fill(colors.gameObjects.pillars);
+    image(
+      pillarsImg,
+      this.pos.x - this.width / 2,
+      this.pos.y - this.height / 2,
+      this.width,
+      this.height
+    );
+    // fill(colors.gameObjects.pillars);
+    noFill();
     if (this.type === "normal")
       rect(this.pos.x, this.pos.y, this.width, this.height, 0, 0, 5, 5);
 
@@ -620,7 +633,7 @@ class Pillar {
       if (bricks.length <= 25) this.updates = 1;
 
       if (bricks.length <= 25 && this.updates === 1 && this.grownTimes <= 1) {
-        this.height += this.growthRate;
+        this.height += this.growthRate / 2;
         this.updates = 0;
         this.grownTimes++;
       }
@@ -650,7 +663,7 @@ class Projectile {
       type === "brick"
         ? createVector(platform.pos.x, platform.pos.y + this.height / 2)
         : createVector(platform.pos.x, pillars.height / 2 - this.height / 2);
-    this.velocity = createVector(0, 2.5);
+    this.velocity = createVector(0, 1);
 
     this.newPos = createVector(
       choose(
@@ -662,7 +675,7 @@ class Projectile {
     );
 
     this.updates = 0;
-    this.growthRate = 0.75;
+    this.growthRate = 1;
   }
 
   display() {
@@ -741,7 +754,15 @@ class Brick {
 
   display() {
     push();
-    fill(colors.gameObjects.bricks);
+    image(
+      bricksImg,
+      this.pos.x - this.width / 2,
+      this.pos.y - this.height / 2,
+      this.width,
+      this.height
+    );
+    // fill(colors.gameObjects.bricks);
+    noFill();
     stroke(colors.strokes.bricks);
     rect(this.pos.x, this.pos.y, this.width, this.height);
     pop();
@@ -819,8 +840,6 @@ let ball;
 let duplicate;
 let cannon;
 
-let slider;
-
 /// Game Object Arrays
 
 let prisoners = [];
@@ -835,6 +854,8 @@ let tutorialBtn;
 /// Assets
 // . Images
 let backgroundImg;
+let paddleImg;
+let bricksImg;
 
 // . MP3 Files
 let song;
@@ -845,8 +866,11 @@ let loseSound;
 
 // **************************************************** //
 
-/// Setup and Draw Functions
+/// Setup, Preload, and Draw Functions
 
+/**
+ * Sets up the game objects and other important variables
+ */
 function setup() {
   gameWindow.X = displayWidth;
   gameWindow.Y = displayHeight;
@@ -917,8 +941,14 @@ function setup() {
   rectMode(CENTER);
 }
 
+/**
+ * Function is needed to preload the assets for the game.
+ */
 function preload() {
   backgroundImg = loadImage("Assets/Images/Background.jpg");
+  paddleImg = loadImage("Assets/Images/Paddle.png");
+  pillarsImg = loadImage("Assets/Images/Pillars.jpg");
+  bricksImg = loadImage("Assets/Images/Bricks.png");
 
   song = createAudio("Assets/Sounds/Song.mp3");
 
@@ -928,6 +958,9 @@ function preload() {
   loseSound = loadSound("Assets/Sounds/LoseSound.wav");
 }
 
+/**
+ * The Magic happens here
+ */
 function draw() {
   background(backgroundImg);
   if (keyIsDown(keyCodesObject.P) || gameState === "paused") pauseMenu();
@@ -1006,7 +1039,7 @@ function endGame() {
   }
 
   textSize(gameStateText.textSize);
-  fill(gameState === "lose" ? colors.text.lose : setInterval(randomColor, 250));
+  fill(gameState === "lose" ? colors.text.lose : randomColor());
   const additionalMessage = gameState === "lose" ? "Game Over" : "Good Job";
 
   text(
@@ -1030,13 +1063,6 @@ function pauseMenu() {
   push();
   textAlign(CENTER);
 
-  // FIXME: Slider doesn't change the volume and it also doesn't dissapear outside of the settings menu
-  slider = createSlider(0, 100, 80);
-  slider.position(950, 950);
-  slider.style("width", "120px");
-
-  song.volume(slider.value() / 100);
-
   fill(isHovering(resumeBtn) ? colors.text.buttons : colors.text.buttonsHover);
   stroke(colors.strokes.buttons);
   strokeWeight(3);
@@ -1054,7 +1080,7 @@ function pauseMenu() {
 }
 
 /**
- * Function used to desplay the tutorial menu
+ * Function used to desplay the tutorial/instructions menu.
  */
 function showKeys() {
   linearGradient(
@@ -1099,7 +1125,7 @@ Meanwhile, the more bricks you destroy the bigger your ball, cannon, and paddle 
 }
 
 /**
- * Displays the score to the user
+ * Displays the score to the user at all time.
  */
 function displayScore() {
   textSize(scoreText.textSize);
@@ -1190,6 +1216,9 @@ function manageBricks(ball) {
   }
 }
 
+/**
+ * Manages the projectiles, calls their appropriate methods to keep the game on moving and ends the game on collision.
+ */
 function manageProjectiles() {
   const enemyBricks = bricks.filter((x) => x.shoots === true);
 
@@ -1255,6 +1284,7 @@ function manageDuplicate() {
 
 /**
  * Used to fullscreen the game. P5.js calls this function on it's own, it just needs to be defined to work.
+ * It's also used for interactivity with the buttons once the game is paused.
  */
 function mousePressed() {
   if (
@@ -1292,7 +1322,7 @@ function mousePressed() {
  * @returns random hexadecimal code (#000000)
  */
 function randomColor() {
-  return "#" + Math.trunc(Math.random() * 0xfff).toString(16);
+  return color("#" + Math.trunc(Math.random() * 0xfff).toString(16));
 }
 
 /**
@@ -1322,6 +1352,11 @@ function choose(...vals) {
   return vals[Math.trunc(Math.random() * vals.length)];
 }
 
+/**
+ * Gets the values from an object
+ * @param { Object } obj The object to extract the keys from
+ * @returns an array containing the object's values, ready to be spread usually
+ */
 function vals(obj) {
   return Object.values(obj);
 }
@@ -1339,10 +1374,7 @@ function luck(val) {
  * Resumes the game. Code is called twice so might as well put it into a helper function
  */
 function resume() {
-  if (keyIsDown(keyCodesObject.R)) {
-    gameState = "playing";
-    slider.remove();
-  }
+  if (keyIsDown(keyCodesObject.R)) gameState = "playing";
 }
 
 /**
