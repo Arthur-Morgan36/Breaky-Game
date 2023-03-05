@@ -1361,6 +1361,11 @@ function linearGradient(color1, color2) {
   }
 }
 
+/**
+ * Checks if the given button is being hovered on
+ * @param { rect } button Given button
+ * @returns true or false
+ */
 function isHovering(button) {
   return (
     mouseX > button.x - button.width &&
