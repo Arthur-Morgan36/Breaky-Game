@@ -61,14 +61,14 @@ Game designed and developed by **Alexandre Hatem**.
 
 ## ☍ Coding Details
 ### ☛ Coding Structure
-The structure of the code is relatively simply, at the top we've got essential variables for the code to run well. They also do not allow repetition in many places, some of them are called more than 15 times. We've also got the classes for the game objects, each game object has it's own class. 
+The structure of the code is relatively simply, at the top we've got global variables that are essential for the game to run properly. They also do not allow repetition in many places, some of them are called more than 15 times. We've also got the classes for the game objects, each game object having it's own class. 
 
-In the setup function, most game objects are initialized and some essential functions such as `rectMode(CENTER`) are called. The draw function is just below, it's about 4-6 lines, because everything is controlled through other functions. 
+In the setup function, most game objects are initialized and some essential functions such as `rectMode(CENTER)` are called. The draw function is just below, it's about 4-6 lines, because everything is controlled through other functions. 
 
 The game states are controlled through functions, and the interractions between the game objects that are repetitive are also managed towards the bottom of the code.
 At the end, there's helper functions, peaces of code that were called many times and pieces of code that were simply way better put in a function for the syntax of the code.
 
 The code is about 1400 lines, I've left a few JSDOC and normal comments to explain what each piece of code does. 
 
-!!! NOTE: There's currently a piece of code that doesn't work insanely well, I'm currently very busy with exam so I do not have the time to fix it right now. 
+!!! NOTE: There's currently a piece of code that doesn't work insanely well, I'm currently very busy with exams and I lack the time to fix it. 
 
